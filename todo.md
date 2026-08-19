@@ -93,3 +93,6 @@
 - [x] Implement an administrator-only user directory and explicit user-role change procedure without allowing ordinary users to alter roles.
 - [x] Add safeguards for self-demotion, last-administrator removal, and privileged role changes, with append-only audit records.
 - [x] Add profile/role authorization tests, update baseline and engineering-interview documentation, and verify responsive user and administrator flows.
+- [x] Diagnose why `/admin?from_webdev=1` receives an HTML document where the tRPC client expects JSON, using browser/network and development-server evidence.
+- [x] Repair the query endpoint or SPA fallback conflict without weakening administrator authorization or OAuth preview behavior.
+- [x] Add a regression test for tRPC JSON responses with preview query parameters, update the engineering log, and re-verify the administrator page.

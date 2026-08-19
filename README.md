@@ -69,7 +69,7 @@ pnpm check
 
 ## 测试覆盖
 
-当前 49 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、管理员用户目录拒绝、角色自改/最后管理员保护、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
+当前 51 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、管理员用户目录拒绝、角色自改/最后管理员保护、预览参数下的 API JSON 回退、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
 
 ## 项目理解与面试复盘
 

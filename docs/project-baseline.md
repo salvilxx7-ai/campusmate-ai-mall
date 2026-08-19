@@ -22,6 +22,8 @@ CampusMate 不是一个只展示页面效果的商城 Demo，而是一套用于�
 
 个人中心的 `profileName`、`campus`、`major`、`bio` 是独立于 OAuth 姓名/邮箱的可编辑资料，更新接口只从会话取得 `userId`，不接收客户端指定的目标用户。管理员可查看用户目录并修改**其他**账户的 `role`；服务端会阻止修改自身角色、降级最后一名管理员，并对允许与拒绝的角色操作追加审计记录。
 
+前端 tRPC 客户端固定使用当前浏览器 origin 下的绝对 `/api/trpc` 端点，不继承页面查询参数。开发和生产的 SPA 回退会将任何未命中的 `/api` 请求返回 JSON 404，而不是 `index.html`；因此即使管理台带 `from_webdev=1` 预览参数，API 客户端也不会把 HTML 当作 JSON 解析。
+
 > **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph、Chroma 和预训练中文语义 Embedding 项目；管理员上传的 HTTPS 公开规则会在当前 sidecar 运行时增量同步至 Chroma，并有状态、失败摘要、管理员重试、版本替换与失效审计。每个新的 Python 运行实例会在首次公开规则请求前 bootstrap 当前 `active + ready + synced` 文档；必须同时说明 Chroma 是容器本地派生索引，MySQL/对象存储才是事实源。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
 
 | 能力 | 当前真实实现 | 不应混淆的替代表述 |
