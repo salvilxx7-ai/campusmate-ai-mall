@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
 import {
   auditLogs,
@@ -25,7 +26,8 @@ import { assertAuditMutationAllowed } from "./security/auditPolicy";
 import { buildOrderReadAuditEvent } from "./security/orderAudit";
 import { resolveOrderRead, resolveOwnerOrderList } from "./security/orderAuditFlow";
 import { decideOrderAccess } from "./security/orderAccess";
-import { storagePut } from "./storage";
+import { storageGetSignedUrl, storagePut } from "./storage";
+import { indexPublicKnowledgeDocument } from "./agent/pythonAgentGateway";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -92,6 +94,10 @@ export async function seedDemoKnowledgeBase(actorUserId: number) {
       storageKey: document.storageKey,
       sourceUrl: document.sourceUrl,
       processingStatus: "ready",
+      contentFingerprint: contentFingerprint(document.content),
+      vectorIndexStatus: "synced",
+      vectorIndexVersion: "seed-bge-runtime-v1",
+      vectorIndexedAt: new Date(),
       uploadedByUserId: actorUserId,
     });
     const created = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.title, document.title)).limit(1);
@@ -130,11 +136,61 @@ export async function listKnowledgeDocuments() {
   return db.select().from(knowledgeDocuments).orderBy(asc(knowledgeDocuments.createdAt));
 }
 
+function contentFingerprint(content: string) {
+  return createHash("sha256").update(content, "utf8").digest("hex");
+}
+
+async function loadStoredKnowledgeContent(storageKey: string) {
+  const signedUrl = await storageGetSignedUrl(storageKey);
+  const response = await fetch(signedUrl);
+  if (!response.ok) throw new Error(`无法读取已上传规则文档（${response.status}）`);
+  return (await response.text()).trim();
+}
+
+export async function syncKnowledgeDocumentToChroma(input: { documentId: number; actorUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const rows = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, input.documentId)).limit(1);
+  const document = rows[0];
+  if (!document) throw new Error("未找到待同步的知识文档");
+  if (!document.sourceUrl.startsWith("https://")) throw new Error("只有带 HTTPS 公开来源的规则文档可以同步至 Chroma");
+
+  await db.update(knowledgeDocuments).set({ vectorIndexStatus: "syncing", vectorIndexError: null }).where(eq(knowledgeDocuments.id, document.id));
+  try {
+    const content = await loadStoredKnowledgeContent(document.storageKey);
+    const fingerprint = contentFingerprint(content);
+    const indexed = await indexPublicKnowledgeDocument({
+      documentId: document.id,
+      title: document.title,
+      sourceLabel: `管理员上传｜${document.title}`,
+      sourceUrl: document.sourceUrl,
+      content,
+      contentFingerprint: fingerprint,
+    });
+    if (!indexed) throw new Error("Python Chroma 索引服务未就绪或拒绝本次同步");
+    await db.update(knowledgeDocuments).set({
+      contentFingerprint: fingerprint,
+      vectorIndexStatus: "synced",
+      vectorIndexVersion: indexed.indexVersion,
+      vectorIndexError: null,
+      vectorIndexedAt: new Date(),
+    }).where(eq(knowledgeDocuments.id, document.id));
+    await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.vector.sync", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "allowed", reason: indexed.indexVersion });
+    return { documentId: document.id, status: "synced" as const, chunkCount: indexed.chunkCount, indexVersion: indexed.indexVersion };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.slice(0, 255) : "未知 Chroma 同步错误";
+    await db.update(knowledgeDocuments).set({ vectorIndexStatus: "failed", vectorIndexError: reason }).where(eq(knowledgeDocuments.id, document.id));
+    await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.vector.sync", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "denied", reason });
+    throw new Error(`Chroma 同步失败：${reason}`);
+  }
+}
+
 export async function uploadKnowledgeDocument(input: {
   actorUserId: number;
   fileName: string;
   mimeType: "text/plain" | "text/markdown";
   sourceType: "policy" | "after_sales" | "faq";
+  publicSourceUrl: string;
   base64Content: string;
 }) {
   const db = await getDb();
@@ -144,13 +200,16 @@ export async function uploadKnowledgeDocument(input: {
   const content = Buffer.from(input.base64Content, "base64").toString("utf8").trim();
   if (content.length < 20) throw new Error("文档内容过短，无法建立可引用知识库");
   if (content.length > 100_000) throw new Error("演示版单个文档最多 100KB");
+  if (!input.publicSourceUrl.startsWith("https://")) throw new Error("请提供 HTTPS 格式的公开规则来源 URL");
   const stored = await storagePut(`knowledge/${input.actorUserId}/${safeName}`, content, input.mimeType);
   await db.insert(knowledgeDocuments).values({
     title: safeName.replace(/\.(md|txt)$/i, ""),
     sourceType: input.sourceType,
     storageKey: stored.key,
-    sourceUrl: stored.url,
+    sourceUrl: input.publicSourceUrl,
     processingStatus: "pending",
+    contentFingerprint: contentFingerprint(content),
+    vectorIndexStatus: "pending",
     uploadedByUserId: input.actorUserId,
   });
   const created = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.storageKey, stored.key)).limit(1);
@@ -170,7 +229,14 @@ export async function uploadKnowledgeDocument(input: {
   }
   await db.update(knowledgeDocuments).set({ processingStatus: "ready" }).where(eq(knowledgeDocuments.id, document.id));
   await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.upload", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "allowed", reason: input.sourceType });
-  return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: stored.url };
+  let syncResult: Awaited<ReturnType<typeof syncKnowledgeDocumentToChroma>>;
+  try {
+    syncResult = await syncKnowledgeDocumentToChroma({ documentId: document.id, actorUserId: input.actorUserId });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "未知索引错误";
+    return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: input.publicSourceUrl, storageUrl: stored.url, vectorIndexStatus: "failed" as const, syncError: message };
+  }
+  return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: input.publicSourceUrl, storageUrl: stored.url, vectorIndexStatus: syncResult.status, indexVersion: syncResult.indexVersion };
 }
 
 export async function searchKnowledgeBase(question: string) {

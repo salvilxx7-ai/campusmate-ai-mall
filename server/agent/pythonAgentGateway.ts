@@ -17,6 +17,23 @@ export type PythonAgentRoute = {
   runtime: "fastapi-langgraph-chroma";
 };
 
+export type PythonIndexDocumentInput = {
+  documentId: number;
+  title: string;
+  sourceLabel: string;
+  sourceUrl: string;
+  content: string;
+  contentFingerprint: string;
+};
+
+export type PythonIndexDocumentResult = {
+  documentId: number;
+  chunkCount: number;
+  collectionCount: number;
+  indexVersion: string;
+  embeddingBackend: "fastembed-bge";
+};
+
 let pythonProcess: ChildProcess | undefined;
 let shutdownRegistered = false;
 
@@ -73,4 +90,29 @@ export async function routeWithPythonAgent(message: string): Promise<PythonAgent
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function indexPublicKnowledgeDocument(input: PythonIndexDocumentInput): Promise<PythonIndexDocumentResult | null> {
+  if (!isEnabled()) return null;
+  startPythonAgent();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    try {
+      const response = await fetch(`${agentUrl()}/v1/index/documents`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(input),
+        signal: controller.signal,
+      });
+      if (response.ok) return await response.json() as PythonIndexDocumentResult;
+      if (response.status >= 400 && response.status < 500) return null;
+    } catch {
+      // A freshly spawned sidecar may still be loading the BGE runtime; retry only this admin path.
+    } finally {
+      clearTimeout(timeout);
+    }
+    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+  }
+  return null;
 }

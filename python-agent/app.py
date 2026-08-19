@@ -9,9 +9,9 @@ from typing import Annotated, Literal, TypedDict
 
 import chromadb
 from fastembed import TextEmbedding
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from langgraph.graph import END, START, StateGraph
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 BASE_DIR = Path(__file__).resolve().parent
 EMBEDDING_MODEL = os.getenv("CAMPUSMATE_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
@@ -19,10 +19,35 @@ EMBEDDING_CACHE = os.getenv("CAMPUSMATE_EMBEDDING_CACHE", "/tmp/campusmate-faste
 EMBEDDING_DIMENSION = 512
 TOP_K = 3
 GROUNDING_THRESHOLD = 0.25
+INDEX_VERSION = "bge-small-zh-v1.5-fastembed-260-48-v1"
 
 
 class RouteRequest(BaseModel):
     message: str = Field(min_length=2, max_length=500)
+
+
+class IndexDocumentRequest(BaseModel):
+    documentId: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=160)
+    sourceLabel: str = Field(min_length=1, max_length=160)
+    sourceUrl: str = Field(min_length=12, max_length=512)
+    content: str = Field(min_length=20, max_length=100_000)
+    contentFingerprint: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+    @field_validator("sourceUrl")
+    @classmethod
+    def require_public_https_source(cls, value: str) -> str:
+        if not value.startswith("https://"):
+            raise ValueError("only https public source URLs are indexable")
+        return value
+
+
+class IndexDocumentResponse(BaseModel):
+    documentId: int
+    chunkCount: int
+    collectionCount: int
+    indexVersion: str
+    embeddingBackend: Literal["fastembed-bge"]
 
 
 class WorkflowStep(BaseModel):
@@ -218,7 +243,41 @@ def health() -> dict[str, object]:
         "embeddingModel": EMBEDDING_MODEL,
         "embeddingBackend": EMBEDDING_BACKEND,
         "embeddingDimension": EMBEDDING_DIMENSION,
+        "indexVersion": INDEX_VERSION,
     }
+
+
+@app.post("/v1/index/documents", response_model=IndexDocumentResponse)
+def index_document(request: IndexDocumentRequest) -> IndexDocumentResponse:
+    if EMBEDDING_BACKEND != "fastembed-bge":
+        raise HTTPException(status_code=503, detail="pretrained embedding backend is unavailable")
+    chunks = chunk_text(request.content)
+    if not chunks:
+        raise HTTPException(status_code=422, detail="document did not produce indexable chunks")
+    ids = [f"admin-{request.documentId}-{request.contentFingerprint[:16]}-{index}" for index in range(len(chunks))]
+    embeddings = encode_texts(chunks)
+    # Chroma is a derived runtime index. Replacing this document's previous chunks avoids stale rules when a future version is re-synced.
+    COLLECTION.delete(where={"documentId": str(request.documentId)})
+    COLLECTION.upsert(
+        ids=ids,
+        documents=chunks,
+        metadatas=[{
+            "title": request.title,
+            "sourceLabel": request.sourceLabel,
+            "sourceUrl": request.sourceUrl,
+            "documentId": str(request.documentId),
+            "contentFingerprint": request.contentFingerprint,
+            "indexVersion": INDEX_VERSION,
+        }] * len(chunks),
+        embeddings=embeddings,
+    )
+    return IndexDocumentResponse(
+        documentId=request.documentId,
+        chunkCount=len(chunks),
+        collectionCount=COLLECTION.count(),
+        indexVersion=INDEX_VERSION,
+        embeddingBackend="fastembed-bge",
+    )
 
 
 @app.post("/v1/route", response_model=RouteResponse)

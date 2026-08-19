@@ -69,7 +69,7 @@ pnpm check
 
 ## 测试覆盖
 
-当前 37 项 TypeScript 测试覆盖 OAuth 登出、管理员过程拒绝、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 网关边界和六案例评测指标聚合；另有 4 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回与个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
+当前 41 项 TypeScript 测试覆盖 OAuth 登出、管理员过程拒绝、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步和六案例评测指标聚合；另有 6 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert、公开来源限制与个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
 
 ## 项目理解与面试复盘
 
@@ -77,5 +77,6 @@ pnpm check
 
 - [`docs/project-baseline.md`](./docs/project-baseline.md)：项目目标、业务验收、真实技术边界、非功能要求与每轮开发的强制复盘流程。
 - [`docs/engineering-and-interview-log.md`](./docs/engineering-and-interview-log.md)：逐模块业务流程、数据流、失败处理、工程取舍与面试深挖问答。
+- [`docs/end-to-end-business-flow.md`](./docs/end-to-end-business-flow.md)：从公开浏览、模拟下单、订单隔离、AI 工具、工单到管理员增量索引的完整业务流与答辩顺序。
 - [`docs/ai-agent-capability-audit.md`](./docs/ai-agent-capability-audit.md)：用户目标陈述与当前实现的真实性核对。
 - [`docs/resume-ready-campusmate.md`](./docs/resume-ready-campusmate.md)：只使用已验证能力的简历项目表述，以及后续技术补齐路线。

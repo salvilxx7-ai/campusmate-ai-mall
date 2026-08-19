@@ -69,3 +69,12 @@
 - [x] Replace the Python Agent hash embedding with the selected pretrained Chinese embedding model while preserving Chroma citations and Node safety fallback.
 - [x] Add retrieval comparison tests and measurements demonstrating semantic-query behavior, model availability fallback, and unchanged order-data boundaries.
 - [x] Update baseline, capability audit, resume-ready description, runtime contract, and engineering/interview log with only verified embedding claims and operational trade-offs.
+- [x] Audit the administrator upload, object-storage metadata, Node knowledge processing, and Python Chroma lifecycle to define the current sync gap.
+- [x] Define a versioned, admin-only incremental Chroma indexing contract with source provenance, idempotency, index status, and observable failure recovery.
+- [x] Implement upload-triggered indexing of approved public rule documents into the Python BGE/Chroma service without forwarding user identities or operational secrets.
+- [x] Add admin index status/retry experience and automated tests proving new rules become retrievable while unauthorized callers and failed syncs remain safe.
+- [x] Complete missing end-to-end marketplace business-flow, data-flow, failure-response, and interview-deep-dive entries in the engineering log.
+- [x] Add an integration test for administrator upload/retry sync state persistence across failed and successful Python index outcomes.
+- [x] Add an admin-path test proving a newly accepted public rule is retrievable through the Node customer-service flow after Chroma sync.
+- [x] Inline the complete marketplace end-to-end business, data, failure-response, and interview-deep-dive record in the engineering log itself.
+- [x] Add a success-path integration test through the actual admin tRPC upload/retry procedures that persists vector status and proves the Node customer-service flow cites the new rule.

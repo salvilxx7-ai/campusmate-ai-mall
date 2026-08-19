@@ -6,7 +6,7 @@
 
 | 检查项 | 应达到的状态 |
 |---|---|
-| `pnpm test:all` | 全部通过（当前为 37 项 TypeScript + 4 项 Python Agent 测试）。 |
+| `pnpm test:all` | 全部通过（当前为 41 项 TypeScript + 6 项 Python Agent 测试）。 |
 | `pnpm check` | TypeScript 无错误。 |
 | 演示披露 | 首页、商品、订单和客服中明确标注模拟/演示边界。 |
 | 来源声明 | README、项目说明页和知识库文档可追溯到公开 URL。 |

@@ -112,11 +112,19 @@ export const knowledgeDocuments = mysqlTable(
     storageKey: varchar("storageKey", { length: 512 }).notNull(),
     sourceUrl: varchar("sourceUrl", { length: 512 }).notNull(),
     processingStatus: mysqlEnum("processingStatus", ["pending", "ready", "failed"]).default("pending").notNull(),
+    contentFingerprint: varchar("contentFingerprint", { length: 64 }),
+    vectorIndexStatus: mysqlEnum("vectorIndexStatus", ["pending", "syncing", "synced", "failed"]).default("pending").notNull(),
+    vectorIndexVersion: varchar("vectorIndexVersion", { length: 64 }),
+    vectorIndexError: varchar("vectorIndexError", { length: 255 }),
+    vectorIndexedAt: timestamp("vectorIndexedAt"),
     uploadedByUserId: int("uploadedByUserId").notNull().references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   },
-  table => [index("knowledge_documents_status_idx").on(table.processingStatus)]
+  table => [
+    index("knowledge_documents_status_idx").on(table.processingStatus),
+    index("knowledge_documents_vector_status_idx").on(table.vectorIndexStatus, table.updatedAt),
+  ]
 );
 
 export const knowledgeChunks = mysqlTable(

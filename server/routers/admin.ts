@@ -13,9 +13,13 @@ export const adminRouter = router({
       fileName: z.string().min(1).max(160),
       mimeType: z.enum(["text/plain", "text/markdown"]),
       sourceType: z.enum(["policy", "after_sales", "faq"]),
+      publicSourceUrl: z.string().url().refine(value => value.startsWith("https://"), "仅支持 HTTPS 公开来源 URL"),
       base64Content: z.string().min(1).max(200_000),
     }))
     .mutation(({ ctx, input }) => db.uploadKnowledgeDocument({ ...input, actorUserId: ctx.user.id })),
+  retryKnowledgeVectorSync: adminProcedure
+    .input(z.object({ documentId: z.number().int().positive() }))
+    .mutation(({ ctx, input }) => db.syncKnowledgeDocumentToChroma({ documentId: input.documentId, actorUserId: ctx.user.id })),
   updateProductStatus: adminProcedure
     .input(z.object({ productId: z.number().int().positive(), status: z.enum(["active", "reserved", "archived"]) }))
     .mutation(({ ctx, input }) => db.updateProductStatus({ ...input, actorUserId: ctx.user.id })),
