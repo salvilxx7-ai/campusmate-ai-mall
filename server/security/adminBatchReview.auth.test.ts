@@ -8,6 +8,8 @@ describe("administrator batch listing review authorization", () => {
   it("rejects an ordinary user before any bulk decision can reach the database", async () => {
     const caller = adminRouter.createCaller(ordinaryUserContext);
     await expect(caller.products({ status: "pending_review" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.systemStatus()).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller.productReviewDetail({ productId: 1 })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller.batchReviewProducts({ productIds: [1], action: "approve" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller.batchReviewProducts({ productIds: [1], action: "reject", reviewReason: "商品信息不完整" })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });

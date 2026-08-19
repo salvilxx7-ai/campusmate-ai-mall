@@ -116,3 +116,8 @@
 - [x] Remove interview-oriented UI copy and navigation from the delivered product while preserving necessary operational, transparency, and administrator experiences.
 - [x] Consolidate requirements, architecture, data model, business flow, security, AI, testing, and runtime decisions into delivery-grade technical documentation with focused code excerpts.
 - [x] Verify UI copy removal, documentation-code consistency, responsive rendering, type checks, tests, production build, and checkpoint materials.
+- [x] Audit existing Python index health data, knowledge synchronization status, product detail queries, image references, and audit-log schema for administrator observability.
+- [x] Implement an admin-only system-status contract and responsive page for Python Agent runtime, embedding backend, index version, document synchronization, and health degradation states.
+- [x] Implement an administrator review-detail drawer with item imagery, seller context, current status, rejection reason, and append-only audit-history query.
+- [x] Add role-gate, status-data, review-history and detail-query tests; update the technical delivery, baseline, business-flow, and engineering-log documentation.
+- [x] Verify desktop/mobile interfaces, full test suite, type checks, production build, and checkpoint the operational-observability release.

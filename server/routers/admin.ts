@@ -14,6 +14,10 @@ export const adminRouter = router({
     .input(z.object({ userId: z.number().int().positive(), role: z.enum(["user", "admin"]) }))
     .mutation(({ ctx, input }) => db.updateUserRoleByAdmin({ actorUserId: ctx.user.id, targetUserId: input.userId, role: input.role })),
   knowledgeDocuments: adminProcedure.query(() => db.listKnowledgeDocuments()),
+  systemStatus: adminProcedure.query(() => db.getAdminSystemStatus()),
+  productReviewDetail: adminProcedure
+    .input(z.object({ productId: z.number().int().positive() }))
+    .query(({ input }) => db.getAdminProductReviewDetail(input.productId)),
   seedDemoKnowledgeBase: adminProcedure.mutation(({ ctx }) => db.seedDemoKnowledgeBase(ctx.user.id)),
   evaluationOverview: adminProcedure.query(() => db.getEvaluationOverview()),
   retrievalQualityOverview: adminProcedure.query(() => runFixedRetrievalQualityEvaluation()),

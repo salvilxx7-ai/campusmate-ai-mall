@@ -146,6 +146,80 @@ export async function listKnowledgeDocuments() {
   return db.select().from(knowledgeDocuments).orderBy(asc(knowledgeDocuments.createdAt));
 }
 
+export async function getAdminSystemStatus() {
+  await ensureDemoKnowledgeBase();
+  const [db, agentHealth] = await Promise.all([getDb(), getPythonAgentHealth()]);
+  const agent = agentHealth
+    ? { available: true as const, ...agentHealth }
+    : { available: false as const, message: "Python Agent 健康检查暂不可用；规则问答将使用 Node 安全回退或提示人工支持。" };
+  if (!db) {
+    return {
+      agent,
+      knowledge: { databaseAvailable: false, documentCount: 0, chunkCount: 0, lifecycleCounts: { active: 0, superseded: 0, retired: 0 }, vectorCounts: { pending: 0, syncing: 0, synced: 0, failed: 0 }, latestIndexedAt: null },
+    };
+  }
+  const [documents, chunkSummary] = await Promise.all([
+    db.select().from(knowledgeDocuments),
+    db.select({ total: count() }).from(knowledgeChunks),
+  ]);
+  const lifecycleCounts = { active: 0, superseded: 0, retired: 0 };
+  const vectorCounts = { pending: 0, syncing: 0, synced: 0, failed: 0 };
+  let latestIndexedAt: Date | null = null;
+  for (const document of documents) {
+    lifecycleCounts[document.lifecycleStatus] += 1;
+    vectorCounts[document.vectorIndexStatus] += 1;
+    if (document.vectorIndexedAt && (!latestIndexedAt || document.vectorIndexedAt > latestIndexedAt)) latestIndexedAt = document.vectorIndexedAt;
+  }
+  return {
+    agent,
+    knowledge: {
+      databaseAvailable: true,
+      documentCount: documents.length,
+      chunkCount: chunkSummary[0]?.total ?? 0,
+      lifecycleCounts,
+      vectorCounts,
+      latestIndexedAt,
+    },
+  };
+}
+
+export async function getAdminProductReviewDetail(productId: number) {
+  await ensureDemoCatalog();
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const rows = await db
+    .select({
+      product: products,
+      category: categories,
+      seller: { id: users.id, name: users.name, profileName: users.profileName, campus: users.campus },
+    })
+    .from(products)
+    .innerJoin(categories, eq(products.categoryId, categories.id))
+    .leftJoin(users, eq(products.sellerUserId, users.id))
+    .where(eq(products.id, productId))
+    .limit(1);
+  const record = rows[0];
+  if (!record) return undefined;
+  const [images, history] = await Promise.all([
+    db.select().from(productImages).where(eq(productImages.productId, productId)).orderBy(asc(productImages.sortOrder)),
+    db
+      .select({
+        id: auditLogs.id,
+        action: auditLogs.action,
+        outcome: auditLogs.outcome,
+        reason: auditLogs.reason,
+        createdAt: auditLogs.createdAt,
+        actor: { id: users.id, name: users.name, profileName: users.profileName },
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.actorUserId, users.id))
+      .where(and(eq(auditLogs.resourceType, "product"), eq(auditLogs.resourceId, String(productId))))
+      .orderBy(desc(auditLogs.createdAt), desc(auditLogs.id))
+      .limit(30),
+  ]);
+  return { ...record, images, history };
+}
+
 function isBuiltinSeedDocument(storageKey: string) {
   return storageKey.startsWith("docs/knowledge-base/");
 }

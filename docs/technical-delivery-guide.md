@@ -209,6 +209,26 @@ def retrieve_policy(state: AgentState) -> AgentState:
     # 仅保留超过阈值的公开来源片段；没有证据时进入人工支持分支。
 ```
 
+### 6.5 系统状态与单件审核追溯
+
+管理员可从侧栏打开 `/admin/system`。该页面在一次受保护查询内汇总 Python Agent `/health` 结果与 MySQL 中的规则文档统计：Agent 运行时、实例 ID、Embedding 模型与维度、Chroma 片段数量、索引版本、文档/分块数、规则生命周期、向量同步状态和最近成功索引时间。健康检查不可用时，页面明确显示降级提示，不暴露环境变量、密钥、Cookie、订单或账户私密字段。
+
+审核队列表格中的“查看”按钮打开侧滑详情。详情查询以商品 ID 为范围，读取商品、分类、对象存储图片引用、发布者的昵称/姓名/学校和 `auditLogs` 中 `resourceType = product` 的最近 30 条记录。它有意不选择发布者邮箱，也不把无关资源的审计日志带入抽屉；管理员能看到的是与审核决策有关的状态、拒绝原因、动作、结果、操作者显示名和时间。
+
+```ts
+systemStatus: adminProcedure.query(() => db.getAdminSystemStatus()),
+productReviewDetail: adminProcedure
+  .input(z.object({ productId: z.number().int().positive() }))
+  .query(({ input }) => db.getAdminProductReviewDetail(input.productId)),
+```
+
+| 观察项 | 数据来源 | 降级解释 |
+|---|---|---|
+| Agent 可用性、实例和模型 | Node 调用本机 FastAPI `/health`。 | 无响应时标记不可用；规则问答仍按现有安全回退或人工支持边界处理。 |
+| 文档/分块与生命周期 | `knowledgeDocuments`、`knowledgeChunks`。 | 数据库不可用时统计归零并显示不可用，不伪造上次数据。 |
+| 向量状态和最近索引 | `vectorIndexStatus`、`vectorIndexedAt`。 | `failed` 计数会把页面标记为“需要关注”。 |
+| 审核历史 | `auditLogs` 的商品资源记录。 | 只展示追加式事实，不提供在抽屉中修改或删除历史的操作。 |
+
 ## 7. 安全与失败处理清单
 
 系统把失败路径视为业务规则的一部分。前端提示用于改善体验；真正的访问控制、状态转换、文件验证和审计均在服务端再次执行。
@@ -225,7 +245,7 @@ def retrieve_policy(state: AgentState) -> AgentState:
 
 ## 8. 质量验证、构建与运行
 
-本项目在本轮交付中通过 **70 项 TypeScript 测试** 和 **7 项 Python Agent 测试**。测试覆盖订单所有权、审计追加策略、发布图片校验、发布状态机、批量审核权限与部分跳过、OAuth 回跳白名单、规则同步、RAG 回退、Function Calling 工具权限、管理员角色保护和产品界面文案回归。
+本项目在本轮交付中通过 **72 项 TypeScript 测试** 和 **7 项 Python Agent 测试**。测试覆盖订单所有权、审计追加策略、发布图片校验、发布状态机、批量审核权限与部分跳过、OAuth 回跳白名单、规则同步、RAG 回退、Function Calling 工具权限、管理员角色保护、产品界面文案回归，以及系统状态/审核详情的权限、数据脱敏和历史追溯。
 
 | 命令 | 作用 |
 |---|---|

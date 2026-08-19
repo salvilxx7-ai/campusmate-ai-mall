@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { BookOpen, LayoutDashboard, LogOut, Package, PanelLeft } from "lucide-react";
+import { Activity, BookOpen, LayoutDashboard, LogOut, Package, PanelLeft } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -31,6 +31,7 @@ const menuItems = [
   { icon: LayoutDashboard, label: "管理概览", path: "/admin" },
   { icon: Package, label: "商品管理", path: "/admin#products" },
   { icon: BookOpen, label: "知识库", path: "/admin#knowledge" },
+  { icon: Activity, label: "系统状态", path: "/admin/system" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import Admin from "@/pages/Admin";
 import CustomerService from "@/pages/CustomerService";
 import Evaluation from "@/pages/Evaluation";
+import SystemStatus from "@/pages/SystemStatus";
 import ProjectGuide from "@/pages/ProjectGuide";
 import Profile from "@/pages/Profile";
 import ListingManager from "@/pages/ListingManager";
@@ -26,6 +27,7 @@ function Router() {
     <Route path="/orders" component={Orders} />
     <Route path="/orders/:id" component={OrderDetail} />
     <Route path="/admin" component={Admin} />
+    <Route path="/admin/system" component={SystemStatus} />
     <Route path="/assistant" component={CustomerService} />
     <Route path="/evaluation" component={Evaluation} />
     <Route path="/project" component={ProjectGuide} />
