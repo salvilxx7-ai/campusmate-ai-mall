@@ -74,16 +74,12 @@ export function SiteHeader() {
                 {user?.role === "admin" ? <><SheetClose asChild><Link href="/admin" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><LayoutDashboard className="size-4" />管理台</Link></SheetClose><SheetClose asChild><Link href="/evaluation" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><BarChart3 className="size-4" />评测</Link></SheetClose></> : null}
               </nav>
               <SheetFooter className="border-t border-border p-4">
-                {!isAuthenticated ? <Button className="w-full rounded-xl" onClick={() => startLogin()}>登录后下单</Button> : <p className="px-2 text-sm text-muted-foreground">当前登录：{user?.name ?? "校园用户"}</p>}
+                {!isAuthenticated ? <div className="grid w-full gap-2"><SheetClose asChild><Link href="/login" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground">普通用户注册 / 登录</Link></SheetClose><SheetClose asChild><Link href="/admin" className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground">管理员登录</Link></SheetClose></div> : <p className="px-2 text-sm text-muted-foreground">当前登录：{user?.name ?? "校园用户"}</p>}
               </SheetFooter>
             </SheetContent>
           </Sheet>
           {loading ? <span className="h-9 w-20 animate-pulse rounded-full bg-secondary" /> : null}
-          {!loading && !isAuthenticated ? (
-            <Button size="sm" onClick={() => startLogin()} className="rounded-full px-4">
-              登录后下单
-            </Button>
-          ) : null}
+          {!loading && !isAuthenticated ? <><Button size="sm" variant="outline" asChild className="hidden rounded-full px-3 lg:inline-flex"><Link href="/admin">管理员登录</Link></Button><Button size="sm" onClick={() => startLogin({ returnTo: "/profile" })} className="rounded-full px-4">用户注册 / 登录</Button></> : null}
           {!loading && isAuthenticated ? (
             <div className="flex items-center gap-2">
               <span className="hidden max-w-28 truncate text-sm font-medium text-foreground sm:block">{user?.name ?? "校园用户"}</span>

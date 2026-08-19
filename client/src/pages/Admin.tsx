@@ -1,7 +1,6 @@
 import { SiteHeader } from "@/components/SiteHeader";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
@@ -9,6 +8,7 @@ import { Archive, BookOpen, Database, LockKeyhole, Package, RefreshCw, ShieldChe
 import { toast } from "sonner";
 import { formatPrice, type CatalogProduct } from "@/components/ProductCard";
 import { useRef, useState } from "react";
+import { Link } from "wouter";
 
 const statusLabel = { active: "已上架", reserved: "已保留", archived: "已下架" };
 
@@ -147,7 +147,7 @@ function AdminContent() {
 export default function Admin() {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen bg-background" />;
-  if (!user) return <div className="min-h-screen bg-background"><SiteHeader /><main className="container py-16"><div className="max-w-xl rounded-[1.5rem] border border-border bg-card p-8"><LockKeyhole className="size-6 text-primary" /><h1 className="mt-5 font-display text-3xl font-bold">管理员登录验证</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">管理台仅在完成身份验证后可继续访问。</p><Button className="mt-6 rounded-xl" onClick={() => startLogin()}>前往登录</Button></div></main></div>;
-  if (user.role !== "admin") return <div className="min-h-screen bg-background"><SiteHeader /><main className="container py-16"><div className="max-w-xl rounded-[1.5rem] border border-destructive/30 bg-card p-8"><LockKeyhole className="size-6 text-destructive" /><h1 className="mt-5 font-display text-3xl font-bold">此处仅限管理员</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">你当前的普通用户身份没有后台权限；服务端也会拒绝所有管理员接口请求。</p></div></main></div>;
+  if (!user) return <div className="min-h-screen bg-background"><SiteHeader /><main className="container py-16"><div className="max-w-xl rounded-[1.5rem] border border-border bg-card p-8"><LockKeyhole className="size-6 text-primary" /><p className="mt-5 text-xs font-semibold tracking-[0.14em] text-primary">ADMINISTRATOR ACCESS</p><h1 className="mt-2 font-display text-3xl font-bold">管理员登录验证</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">请使用已由系统配置为管理员的账号完成授权。选择此入口不会创建管理员角色，首次普通用户授权仍默认为用户角色。</p><Button asChild className="mt-6 rounded-xl"><Link href="/login">前往管理员登录</Link></Button></div></main></div>;
+  if (user.role !== "admin") return <div className="min-h-screen bg-background"><SiteHeader /><main className="container py-16"><div className="max-w-xl rounded-[1.5rem] border border-destructive/30 bg-card p-8"><LockKeyhole className="size-6 text-destructive" /><h1 className="mt-5 font-display text-3xl font-bold">此处仅限管理员</h1><p className="mt-2 text-sm leading-6 text-muted-foreground">你当前的普通用户身份没有后台权限；服务端也会拒绝所有管理员接口请求。</p><Button asChild variant="outline" className="mt-6 rounded-xl"><Link href="/">回到商城</Link></Button></div></main></div>;
   return <DashboardLayout><AdminContent /></DashboardLayout>;
 }

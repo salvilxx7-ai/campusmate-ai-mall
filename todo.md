@@ -84,3 +84,7 @@
 - [x] Implement administrator rule-document replacement, deactivation/deletion audit, bulk rebuild trigger, and observable rebuild progress without exposing private data to Python.
 - [x] Add recovery, lifecycle, authorization, and stale-citation tests; update full business-flow and interview logs with operational trade-offs.
 - [x] Implement the user-confirmed lightweight rebuild path: request-scoped bootstrap and administrator-triggered synchronous batch rebuild, without a persistent queue worker.
+- [x] Diagnose the reported transparent, pointer-blocking overlay; verify that it belongs to the external preview editor rather than the CampusMate page, and re-verify the app's responsive administrator surface without it.
+- [x] Introduce separate visible entry points for ordinary user registration/login and administrator login while preserving server-side role gates.
+- [x] Define the registration, authentication, role-assignment, and admin-access data flow without allowing self-service administrator privilege escalation.
+- [x] Add OAuth-return authorization regression tests, update the baseline/interview log, and re-verify desktop and mobile administrator/login-route states.

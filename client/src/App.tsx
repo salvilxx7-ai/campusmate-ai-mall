@@ -7,7 +7,8 @@ import Evaluation from "@/pages/Evaluation";
 import ProjectGuide from "@/pages/ProjectGuide";
 import Profile from "@/pages/Profile";
 import Goods from "@/pages/Goods";
-import Home from "@/pages/Home";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
 import OrderDetail from "@/pages/OrderDetail";
 import Orders from "@/pages/Orders";
 import ProductDetail from "@/pages/ProductDetail";
@@ -27,6 +28,7 @@ function Router() {
     <Route path="/evaluation" component={Evaluation} />
     <Route path="/project" component={ProjectGuide} />
     <Route path="/profile" component={Profile} />
+    <Route path="/login" component={Login} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
   </Switch>;
