@@ -6,7 +6,7 @@ import { Bot, Database, FileSearch, KeyRound, Layers3, ShieldCheck, type LucideI
 const modules: Array<{ title: string; description: string; Icon: LucideIcon }> = [
   { title: "商品与订单", description: "公开商品发现、登录后模拟下单，以及仅本人可见的订单空间", Icon: ShieldCheck },
   { title: "RAG 知识库", description: "BGE/Chroma 语义召回、TF-IDF 回退、来源片段、规则版本与低置信转人工", Icon: FileSearch },
-  { title: "Agent 路由", description: "FastAPI + LangGraph + Chroma 公开路由，Node 网关执行商品、订单与工单工具", Icon: Bot },
+  { title: "Agent 路由", description: "FastAPI + LangGraph + Chroma 公开路由；原生 Function Calling 选工具，Node 网关执行商品、订单与工单", Icon: Bot },
   { title: "权限与审计", description: "OAuth 会话、管理员过程、所有者验证、角色保护与追加式安全记录", Icon: KeyRound },
 ];
 
@@ -53,7 +53,7 @@ export default function ProjectGuide() {
           <p className="text-xs font-semibold tracking-[0.15em] text-primary">INTERVIEW DEEP DIVE</p>
           <h2 className="mt-2 font-display text-3xl font-bold tracking-[-0.05em]">面试官可以一直追问。</h2>
           <p className="mt-4 text-sm leading-7 text-muted-foreground">下面的问题对应实际代码中的路由、表结构、检索器、审计函数与测试，而不是只停留在功能描述。</p>
-          <Badge variant="secondary" className="mt-5 font-normal">51 项 TypeScript + 7 项 Python 自动化测试</Badge>
+          <Badge variant="secondary" className="mt-5 font-normal">59 项 TypeScript + 7 项 Python 自动化测试</Badge>
         </div>
         <Accordion type="single" collapsible className="rounded-[1.25rem] border border-border bg-card px-5">
           <AccordionItem value="rag"><AccordionTrigger>为什么检索低分时要拒答？</AccordionTrigger><AccordionContent>因为模型的流畅表达不能替代事实依据。CampusMate 的 Node 回退检索与 Chroma 检索都受阈值控制；若仍无足够证据，就明确提示知识库覆盖不足并转人工。</AccordionContent></AccordionItem>

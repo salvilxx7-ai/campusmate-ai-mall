@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { users } from "../../drizzle/schema";
-import { createSupportTicket, getDb, listSupportTicketsForUser } from "../db";
+import { createSupportTicket, getDb, listSupportTicketsForUser, updateSupportTicketStatusByAdmin } from "../db";
 
 describe("simulated support-ticket persistence", () => {
   it("stores the handoff record under the authenticated actor and returns only that actor's tickets", async () => {
@@ -26,5 +26,10 @@ describe("simulated support-ticket persistence", () => {
     expect(ticket.userId).toBe(actor.id);
     expect(tickets.some(item => item.id === ticket.id)).toBe(true);
     expect(tickets.every(item => item.userId === actor.id)).toBe(true);
+
+    const transition = await updateSupportTicketStatusByAdmin({ actorUserId: actor.id, ticketId: ticket.id, status: "in_review" });
+    expect(transition.changed).toBe(true);
+    expect(transition.ticket.status).toBe("in_review");
+    expect(transition.latencyMs).toBeGreaterThanOrEqual(0);
   });
 });

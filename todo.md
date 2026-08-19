@@ -96,3 +96,11 @@
 - [x] Diagnose why `/admin?from_webdev=1` receives an HTML document where the tRPC client expects JSON, using browser/network and development-server evidence.
 - [x] Repair the query endpoint or SPA fallback conflict without weakening administrator authorization or OAuth preview behavior.
 - [x] Add a regression test for tRPC JSON responses with preview query parameters, update the engineering log, and re-verify the administrator page.
+- [x] Audit every supplied RAG Agent resume claim against current CampusMate code, database schema, runtime behavior, tests, and measured evidence.
+- [x] Define and implement only the remaining verifiable gap-closure features or evaluation evidence needed for product search, personal-order tools, human handoff, retrieval quality, and frontend delivery claims.
+- [x] Add regression tests and reproducible measurements for every newly implemented gap-closure capability without fabricating PHP, page-count, performance, internship, or course-award claims.
+- [x] Rewrite the resume-ready description, README, project guide, baseline, and engineering/interview log with the final claim-by-claim evidence and limits.
+- [x] Add an expanded fixed retrieval-evaluation dataset and deterministic Recall@K / MRR calculation for policy and product-search retrieval claims.
+- [x] Add reproducible measurements for native Function Calling selection and the administrator ticket queue, including success, fallback, authorization, and latency fields.
+- [x] Add a front-end delivery evidence record that inventories shipped routes and explicitly preserves the absence of a 2-second loading claim until real Web Vitals are captured.
+- [x] Add a structured native-tool measurement record for catalog success, unauthenticated own-order/ticket rejection, fallback behavior, and per-case latency fields.

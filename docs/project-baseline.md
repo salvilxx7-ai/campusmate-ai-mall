@@ -24,14 +24,16 @@ CampusMate 不是一个只展示页面效果的商城 Demo，而是一套用于�
 
 前端 tRPC 客户端固定使用当前浏览器 origin 下的绝对 `/api/trpc` 端点，不继承页面查询参数。开发和生产的 SPA 回退会将任何未命中的 `/api` 请求返回 JSON 404，而不是 `index.html`；因此即使管理台带 `from_webdev=1` 预览参数，API 客户端也不会把 HTML 当作 JSON 解析。
 
+客服 Agent 的 OpenAI-compatible 原生 Function Calling 仅用于选择 `search_catalog`、`own_order_lookup` 与 `create_support_ticket` 三个受限工具。模型从不接触 Cookie、用户 ID、订单、数据库或密钥；Node 会重新验证参数、登录状态与显式人工请求，再执行本地商品、订单或模拟工单操作。工单处理状态只允许管理员通过 `adminProcedure` 从 `open` 推进到 `in_review` 或 `resolved`，并追加审计记录。
+
 > **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph、Chroma 和预训练中文语义 Embedding 项目；管理员上传的 HTTPS 公开规则会在当前 sidecar 运行时增量同步至 Chroma，并有状态、失败摘要、管理员重试、版本替换与失效审计。每个新的 Python 运行实例会在首次公开规则请求前 bootstrap 当前 `active + ready + synced` 文档；必须同时说明 Chroma 是容器本地派生索引，MySQL/对象存储才是事实源。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
 
 | 能力 | 当前真实实现 | 不应混淆的替代表述 |
 |---|---|---|
 | 文档处理 | Markdown/TXT 上传；对象存储和 MySQL 保留事实记录；管理员 HTTPS 公开规则由 Node 增量写入 Python Chroma，Python 使用带重叠的滑动窗口；规则具备 `active/superseded/retired` 生命周期、请求内 bootstrap 与同步批量重建。 | Chroma 为容器本地派生索引；bootstrap 由首次公开规则请求触发，当前不使用常驻异步队列，适用于受控的小规模演示语料。 |
-| 检索 | Python Chroma 通过 FastEmbed ONNX 运行 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量 Top-K；Node TF-IDF/余弦仅作回退，均返回分数和来源。 | 固定 5 题演示集为 BGE 4/5、哈希 3/5，不能外推为生产准确率。 |
-| Agent | LangGraph 状态图：接收 → 意图 → Chroma 检索/交还 Node 网关；Node 执行受控工具。 | 不是原生大模型 Function Calling。 |
-| 工具 | 服务端商品检索、本人订单查询和模拟工单创建/查询。 | 工具由业务代码直接受控调用，不是模型任意访问数据库。 |
+| 检索 | Python Chroma 通过 FastEmbed ONNX 运行 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量 Top-K；Node TF-IDF/余弦仅作回退，均返回分数和来源；另有公开规则 6 题固定集计算 Node 回退的 Recall@3/MRR。 | 固定 5 题 BGE/哈希比较和 6 题 TF-IDF/余弦评测都只描述当前演示语料，不能外推为生产准确率。 |
+| Agent | LangGraph 状态图：接收 → 意图 → Chroma 检索/交还 Node 网关；OpenAI-compatible 原生 Function Calling 选择受限工具，Node 负责授权与执行。 | Function Calling 是编排信号，不授予模型数据库、订单或密钥访问权。 |
+| 工具 | 商品检索、本人订单查询、模拟工单创建/查询和管理员工单状态流转。 | 商品、订单与工单工具均由 Node 重新验证参数、会话与显式人工请求后执行。 |
 | 性能 | 已记录开发服务本地 HTTP 响应基线。 | 不等同于真实浏览器页面加载或生产 SLA。 |
 
 完整逐项审计见 [`docs/ai-agent-capability-audit.md`](./ai-agent-capability-audit.md)，简历可用版本见 [`docs/resume-ready-campusmate.md`](./resume-ready-campusmate.md)。
@@ -44,9 +46,9 @@ CampusMate 不是一个只展示页面效果的商城 Demo，而是一套用于�
 | 模拟下单 | 登录后在商品详情创建订单。 | 创建订单与订单快照，将商品设为预留，追加审计。 | 未登录不能创建；非 active 商品不能下单。 |
 | 订单与个人中心 | 查看本人订单轨迹、发布物品、统计与基本资料；可编辑昵称、学校、专业、简介。 | 以会话用户 ID 分别过滤订单与 `sellerUserId`，并以同一 ID 更新独立 profile 字段。 | OAuth 姓名、邮箱和角色不可在个人中心修改；其他用户资料不进入查询或更新路径。 |
 | 规则咨询 | 在客服页询问上架、售后或安全规则。 | 检索知识块、判断证据阈值、以证据生成回答并返回引用。 | 无匹配时禁止猜测，转人工建议。 |
-| 商品/订单工具 | 询问商品或“我的订单”。 | 调用商品检索或当前账户订单工具，返回结构化工作流与工具结果。 | 未登录订单查询被阻止；越权订单读取拒绝并审计。 |
-| 人工转接 | 对无匹配或主动转人工请求创建模拟工单。 | 保存问题、回答摘要、工作流轨迹和当前用户 ID，追加审计。 | 只允许登录用户创建；只返回本人历史工单；不联系真实客服。 |
-| 管理与评测 | 管理员维护商品、知识库、用户角色并运行固定评测。 | `adminProcedure` 校验，角色变更写入追加式审计。 | 普通用户 API 调用仍被服务端拒绝；管理员不能修改自身角色或移除最后管理员。 |
+| 商品/订单工具 | 询问商品或“我的订单”。 | 原生 Function Calling 可选择商品/本人订单工具，Node 重新校验后执行并返回结构化工作流与工具结果。 | 未登录订单查询被阻止；越权订单读取拒绝并审计。 |
+| 人工转接 | 对无匹配或主动转人工请求创建模拟工单。 | 仅在登录且明确请求人工、转接、投诉或工单时允许工具创建；保存问题、摘要、工作流和当前用户 ID，管理员可推进处理状态。 | 用户只看本人历史工单；不联系真实客服；模型不能自行跳过同意门槛。 |
+| 管理与评测 | 管理员维护商品、知识库、用户角色、模拟工单队列并运行固定 Agent/检索评测。 | `adminProcedure` 校验，角色和工单状态变更写入追加式审计；评测展示固定 6 类 Agent 案例与 6 题检索质量。 | 普通用户 API 调用仍被服务端拒绝；管理员不能修改自身角色或移除最后管理员；检索指标不是生产 SLA。 |
 
 ## 4. 非功能验收要求
 

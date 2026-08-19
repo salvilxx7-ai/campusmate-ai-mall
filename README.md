@@ -14,7 +14,7 @@ CampusMate 是一套面向作品集演示的全栈校园二手商城。项目将
 | RAG 客服 | Node 侧 TF-IDF 兜底检索与 LLM 受控回答；Python FastAPI + LangGraph + Chroma 负责公开规则的意图路由与本地向量召回，规则回答保留引用与低置信转人工。 |
 | Agent 路由 | 显式记录接收、意图分流、检索、受控工具调用、答案生成与转人工准备；商品、订单与工单工具始终由 Node 会话网关执行。 |
 | 模拟工单 | 登录用户可将转人工上下文保存为仅本人可见的演示工单；创建和查询均由服务端会话限定并写入审计。 |
-| 管理后台 | 仅管理员可见的商品上下架、用户角色管理、演示规则初始化、受控文档上传、规则版本替换/失效和请求内批量索引重建。 |
+| 管理后台 | 仅管理员可见的商品上下架、用户角色管理、模拟工单处理队列、演示规则初始化、受控文档上传、规则版本替换/失效和请求内批量索引重建。 |
 | 评测 | 固定案例集、实际运行记录、意图正确率、引用完整性、拒答正确性和平均响应时间。 |
 
 ## 架构
@@ -69,7 +69,7 @@ pnpm check
 
 ## 测试覆盖
 
-当前 51 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、管理员用户目录拒绝、角色自改/最后管理员保护、预览参数下的 API JSON 回退、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
+当前 59 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、管理员用户目录拒绝、角色自改/最后管理员保护、原生 Function Calling 的成功/授权拒绝/回退测量、管理员工单队列拒绝与状态耗时、固定检索 Recall@K/MRR、预览参数下的 API JSON 回退、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
 
 ## 项目理解与面试复盘
 
@@ -79,4 +79,6 @@ pnpm check
 - [`docs/engineering-and-interview-log.md`](./docs/engineering-and-interview-log.md)：逐模块业务流程、数据流、失败处理、工程取舍与面试深挖问答。
 - [`docs/end-to-end-business-flow.md`](./docs/end-to-end-business-flow.md)：从公开浏览、模拟下单、订单隔离、AI 工具、工单到管理员增量索引的完整业务流与答辩顺序。
 - [`docs/ai-agent-capability-audit.md`](./docs/ai-agent-capability-audit.md)：用户目标陈述与当前实现的真实性核对。
+- [`docs/target-rag-agent-claim-audit.md`](./docs/target-rag-agent-claim-audit.md)：目标 RAG Agent 要求、当前实现证据、可用表述与不得虚构边界的逐项核验。
+- [`docs/runtime-evidence-and-delivery-inventory.md`](./docs/runtime-evidence-and-delivery-inventory.md)：原生 Function Calling 真实响应、固定检索质量结果与前端路由交付清单。
 - [`docs/resume-ready-campusmate.md`](./docs/resume-ready-campusmate.md)：只使用已验证能力的简历项目表述，以及后续技术补齐路线。

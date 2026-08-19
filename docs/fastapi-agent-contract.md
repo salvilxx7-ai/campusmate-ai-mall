@@ -61,4 +61,4 @@ pnpm test:all
 pnpm check
 ```
 
-当前结果为 **51 项 TypeScript 测试与 7 项 Python Agent 测试通过**。其中 `server/agent/pythonAgentGateway.integration.test.ts` 通过 mock FastAPI 地址验证两条跨服务契约：第一，Node 仅向 Python 发送 `{ message }`，并消费 LangGraph/Chroma 返回的公开证据；第二，匿名订单意图即使已被 Python 路由，仍由 Node 保持登录门槛，不会向 Python 发送身份或订单数据。`knowledgeLifecycle.router.integration.test.ts` 进一步覆盖“新版本先同步、旧版本 supersede、运行时 bootstrap、失效删除后不再引用”的端到端链路；`auth.oauthReturnPath.test.ts` 验证 OAuth 回调不能被外部跳转目标利用。资料编辑与角色管理测试则停留在 Node/tRPC 与 MySQL 边界，绝不向 Python 转发身份字段或角色变更数据。
+当前结果为 **59 项 TypeScript 测试与 7 项 Python Agent 测试通过**。其中 `server/agent/pythonAgentGateway.integration.test.ts` 通过 mock FastAPI 地址验证两条跨服务契约：第一，Node 仅向 Python 发送 `{ message }`，并消费 LangGraph/Chroma 返回的公开证据；第二，匿名订单意图即使已被 Python 路由，仍由 Node 保持登录门槛，不会向 Python 发送身份或订单数据。`knowledgeLifecycle.router.integration.test.ts` 进一步覆盖“新版本先同步、旧版本 supersede、运行时 bootstrap、失效删除后不再引用”的端到端链路；`auth.oauthReturnPath.test.ts` 验证 OAuth 回调不能被外部跳转目标利用。原生工具调用的成功/拒绝/回退测量、资料编辑、角色管理、工单队列与固定检索质量测试均停留在 Node/tRPC 与 MySQL 边界，绝不向 Python 转发身份字段、角色变更或工单处理数据。

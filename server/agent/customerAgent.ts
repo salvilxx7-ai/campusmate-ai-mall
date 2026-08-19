@@ -2,11 +2,12 @@ import * as db from "../db";
 import { invokeLLM } from "../_core/llm";
 import { decideGrounding } from "./grounding";
 import { routeWithPythonAgent, type PythonAgentRoute } from "./pythonAgentGateway";
+import { selectCustomerToolWithFunctionCalling } from "./nativeToolCalling";
 
 export type CustomerIntent = "policy_qa" | "product_search" | "own_order" | "human_handoff";
 export type WorkflowStage = "received" | "intent_routed" | "retrieval" | "tool_invoked" | "answer_generated" | "handoff_ready";
 export type WorkflowStep = { stage: WorkflowStage; detail: string };
-export type ToolResult = { tool: "knowledge_search" | "product_search" | "own_order_lookup" | "handoff_advice"; status: "completed" | "blocked" | "not_found"; summary: string };
+export type ToolResult = { tool: "knowledge_search" | "product_search" | "own_order_lookup" | "handoff_advice" | "handoff_ticket"; status: "completed" | "blocked" | "not_found"; summary: string };
 
 export function classifyCustomerIntent(message: string): CustomerIntent {
   const normalized = message.toLowerCase();
@@ -84,7 +85,10 @@ export async function answerCustomerMessage(input: { message: string; actor?: { 
   const shouldBootstrap = (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") || process.env.CAMPUSMATE_PYTHON_BOOTSTRAP === "true";
   const bootstrap = shouldBootstrap ? await db.bootstrapActiveKnowledgeIntoChroma() : { status: "skipped" as const, total: 0, succeeded: 0, failed: 0 };
   const pythonRoute = await routeWithPythonAgent(input.message);
-  const intent = pythonRoute?.intent ?? classifyCustomerIntent(input.message);
+  const routedIntent = pythonRoute?.intent ?? classifyCustomerIntent(input.message);
+  const explicitHandoffRequest = /人工|真人|投诉|转接|客服专员|提交工单/.test(input.message);
+  const nativeTool = await selectCustomerToolWithFunctionCalling({ message: input.message, canAccessOwnOrder: Boolean(input.actor), canCreateTicket: Boolean(input.actor && explicitHandoffRequest) });
+  const intent = nativeTool?.kind === "search_catalog" ? "product_search" : nativeTool?.kind === "own_order_lookup" ? "own_order" : nativeTool?.kind === "create_support_ticket" ? "human_handoff" : routedIntent;
   if (pythonRoute) {
     workflow.push(...pythonRoute.workflow);
     if (bootstrap.status === "rebuilt") append(workflow, "tool_invoked", `Python sidecar 启动后已恢复 ${bootstrap.succeeded} 份有效管理员规则索引。`);
@@ -94,15 +98,22 @@ export async function answerCustomerMessage(input: { message: string; actor?: { 
     append(workflow, "received", "接收用户问题，进入受控客服工作流。" );
     append(workflow, "intent_routed", `本地安全回退识别意图：${intent}。` );
   }
+  if (nativeTool) append(workflow, "tool_invoked", `原生 Function Calling 选择工具：${nativeTool.kind}；Node 将在服务端校验参数并执行。`);
 
   if (intent === "human_handoff") {
+    if (nativeTool?.kind === "create_support_ticket" && input.actor) {
+      const ticket = await db.createSupportTicket({ userId: input.actor.id, category: nativeTool.category, sourceMessage: input.message, summary: nativeTool.summary, workflowTrace: workflow });
+      toolResults.push({ tool: "handoff_ticket", status: "completed", summary: `已通过受控工单工具创建 ${ticket.ticketCode}。` });
+      handoff(workflow, toolResults, "用户明确请求人工支持，已提交模拟人工工单。" );
+      return { intent, answer: `已创建模拟人工工单 ${ticket.ticketCode}。它不会联系真实客服；管理员可在演示后台查看并更新处理状态。`, citations: [], handoff: true, ticket, workflow, toolResults };
+    }
     handoff(workflow, toolResults, "用户主动请求人工支持。" );
     return { intent, answer: "已为你准备模拟人工支持。请补充商品链接、订单编号（如有）、商品描述和你希望解决的问题；当前演示站不会发起真实人工工单。", citations: [], handoff: true, workflow, toolResults };
   }
 
   if (intent === "product_search") {
     append(workflow, "tool_invoked", "调用演示商品检索工具，仅搜索可下单商品。" );
-    const products = await db.listProducts({ query: input.message, status: "active", limit: 3 });
+    const products = await db.listProducts({ query: nativeTool?.kind === "search_catalog" ? nativeTool.query : input.message, status: "active", limit: 3 });
     if (products.length === 0) {
       toolResults.push({ tool: "product_search", status: "not_found", summary: "演示目录中没有匹配的可下单商品。" });
       handoff(workflow, toolResults, "商品检索无结果，准备人工支持建议。" );
@@ -120,7 +131,7 @@ export async function answerCustomerMessage(input: { message: string; actor?: { 
       append(workflow, "answer_generated", "返回登录门槛说明，不泄露任何订单数据。" );
       return { intent, answer: "订单查询需要先登录。登录后我只能读取你自己的模拟订单，无法查看其他账户的数据。", citations: [], handoff: false, requiresLogin: true, workflow, toolResults };
     }
-    const orderId = extractOrderId(input.message);
+    const orderId = nativeTool?.kind === "own_order_lookup" ? nativeTool.orderId ?? extractOrderId(input.message) : extractOrderId(input.message);
     if (orderId) {
       const result = await db.getOrderForActor({ orderId, actorUserId: input.actor.id, isAdmin: false });
       if (result.kind === "missing") {

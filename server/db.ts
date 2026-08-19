@@ -848,6 +848,46 @@ export async function listSupportTicketsForUser(userId: number) {
   return tickets;
 }
 
+export async function listSupportTicketsForAdmin() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: supportTickets.id,
+    ticketCode: supportTickets.ticketCode,
+    userId: supportTickets.userId,
+    category: supportTickets.category,
+    status: supportTickets.status,
+    sourceMessage: supportTickets.sourceMessage,
+    summary: supportTickets.summary,
+    createdAt: supportTickets.createdAt,
+    updatedAt: supportTickets.updatedAt,
+    requesterName: users.name,
+    requesterProfileName: users.profileName,
+    requesterEmail: users.email,
+  }).from(supportTickets).innerJoin(users, eq(supportTickets.userId, users.id)).orderBy(asc(supportTickets.status), desc(supportTickets.updatedAt));
+}
+
+export async function updateSupportTicketStatusByAdmin(input: { actorUserId: number; ticketId: number; status: "open" | "in_review" | "resolved" }) {
+  const startedAt = performance.now();
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const ticket = (await db.select().from(supportTickets).where(eq(supportTickets.id, input.ticketId)).limit(1))[0];
+  if (!ticket) throw new Error("未找到模拟工单");
+  if (ticket.status === input.status) return { changed: false as const, ticket, latencyMs: Number((performance.now() - startedAt).toFixed(2)) };
+  await db.update(supportTickets).set({ status: input.status }).where(eq(supportTickets.id, input.ticketId));
+  const updated = (await db.select().from(supportTickets).where(eq(supportTickets.id, input.ticketId)).limit(1))[0];
+  if (!updated) throw new Error("模拟工单状态更新失败");
+  await writeAuditLog({
+    actorUserId: input.actorUserId,
+    action: "support_ticket.status.update",
+    resourceType: "support_ticket",
+    resourceId: String(input.ticketId),
+    outcome: "allowed",
+    reason: `${ticket.status}_to_${input.status}`,
+  });
+  return { changed: true as const, ticket: updated, latencyMs: Number((performance.now() - startedAt).toFixed(2)) };
+}
+
 async function getOrderWithItems(orderId: number) {
   const db = await getDb();
   if (!db) return undefined;

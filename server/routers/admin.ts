@@ -1,16 +1,22 @@
 import { z } from "zod";
 import * as db from "../db";
 import { adminProcedure, router } from "../_core/trpc";
+import { runFixedRetrievalQualityEvaluation } from "../evaluation/retrievalQuality";
 
 export const adminRouter = router({
   products: adminProcedure.query(() => db.listProducts({})),
   users: adminProcedure.query(() => db.listUsersForAdmin()),
+  supportTickets: adminProcedure.query(() => db.listSupportTicketsForAdmin()),
+  updateSupportTicketStatus: adminProcedure
+    .input(z.object({ ticketId: z.number().int().positive(), status: z.enum(["open", "in_review", "resolved"]) }))
+    .mutation(({ ctx, input }) => db.updateSupportTicketStatusByAdmin({ actorUserId: ctx.user.id, ...input })),
   updateUserRole: adminProcedure
     .input(z.object({ userId: z.number().int().positive(), role: z.enum(["user", "admin"]) }))
     .mutation(({ ctx, input }) => db.updateUserRoleByAdmin({ actorUserId: ctx.user.id, targetUserId: input.userId, role: input.role })),
   knowledgeDocuments: adminProcedure.query(() => db.listKnowledgeDocuments()),
   seedDemoKnowledgeBase: adminProcedure.mutation(({ ctx }) => db.seedDemoKnowledgeBase(ctx.user.id)),
   evaluationOverview: adminProcedure.query(() => db.getEvaluationOverview()),
+  retrievalQualityOverview: adminProcedure.query(() => runFixedRetrievalQualityEvaluation()),
   runFixedEvaluation: adminProcedure.mutation(() => db.runFixedEvaluation()),
   uploadKnowledgeDocument: adminProcedure
     .input(z.object({
