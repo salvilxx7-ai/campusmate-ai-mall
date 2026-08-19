@@ -151,11 +151,32 @@ export const auditLogs = mysqlTable(
   ]
 );
 
+export const supportTickets = mysqlTable(
+  "supportTickets",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    ticketCode: varchar("ticketCode", { length: 32 }).notNull().unique(),
+    userId: int("userId").notNull().references(() => users.id),
+    category: mysqlEnum("category", ["policy", "order", "security", "other"]).notNull(),
+    status: mysqlEnum("status", ["open", "in_review", "resolved"]).default("open").notNull(),
+    sourceMessage: text("sourceMessage").notNull(),
+    summary: varchar("summary", { length: 500 }).notNull(),
+    workflowTraceJson: json("workflowTraceJson").notNull(),
+    isDemo: int("isDemo").default(1).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  table => [
+    index("support_tickets_user_created_idx").on(table.userId, table.createdAt),
+    index("support_tickets_status_created_idx").on(table.status, table.createdAt),
+  ]
+);
+
 export const evaluationCases = mysqlTable(
   "evaluationCases",
   {
     id: int("id").autoincrement().primaryKey(),
-    caseType: mysqlEnum("caseType", ["policy", "no_match", "product", "own_order", "cross_user_order"]).notNull(),
+    caseType: mysqlEnum("caseType", ["policy", "no_match", "product", "own_order", "cross_user_order", "handoff"]).notNull(),
     question: text("question").notNull(),
     expectedIntent: varchar("expectedIntent", { length: 64 }).notNull(),
     expectedOutcome: varchar("expectedOutcome", { length: 64 }).notNull(),
@@ -192,3 +213,4 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Product = typeof products.$inferSelect;
 export type Order = typeof orders.$inferSelect;
+export type SupportTicket = typeof supportTickets.$inferSelect;

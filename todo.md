@@ -47,3 +47,12 @@
 - [x] Diagnose the AI customer-service route, header entry, authentication behavior, and conversation flow to explain its current visibility.
 - [x] Improve the discoverability and first-use guidance of the AI customer-service experience where needed.
 - [x] Verify the AI customer-service experience on desktop and mobile, update tests or documentation as appropriate, and save an auditable checkpoint.
+- [x] Audit the supplied RAG Agent resume claims against CampusMate source code, tests, documentation, and verifiable runtime behavior.
+- [x] Produce a claim-by-claim distinction between implemented capabilities, materially different implementations, and unsupported technologies or metrics.
+- [x] Write a truthful CampusMate resume-ready project description and a prioritized technical gap-closure plan.
+- [x] Define a verified CampusMate target scope that distinguishes equivalent TypeScript implementations from unimplemented Python/FastAPI/LangGraph/Chroma claims.
+- [x] Strengthen the customer-service Agent with an explicit stateful workflow, tool-result presentation, and a simulated work-order handoff record.
+- [x] Extend fixed evaluation cases and tests to cover conversational routing, tool permissions, refusal/handoff behavior, and the new work-order flow.
+- [x] Record reproducible client performance evidence and update project documentation with only measured, supportable results.
+- [x] Add a dedicated resume-ready CampusMate project description that uses only verified technologies and measurable capabilities.
+- [x] Revalidate the persisted performance evidence and all documentation updates with the full test, type-check, and production-build workflow.

@@ -13,6 +13,7 @@ import {
   orders,
   productImages,
   products,
+  supportTickets,
   users,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -198,16 +199,19 @@ const demoEvaluationBlueprints = [
   { caseType: "product" as const, question: "有没有适合复习的教材？", expectedIntent: "product_search", expectedOutcome: "catalog" },
   { caseType: "own_order" as const, question: "请查我的订单", expectedIntent: "own_order", expectedOutcome: "login_required" },
   { caseType: "cross_user_order" as const, question: "请查订单 99999", expectedIntent: "own_order", expectedOutcome: "denied" },
+  { caseType: "handoff" as const, question: "我需要人工客服协助", expectedIntent: "human_handoff", expectedOutcome: "handoff" },
 ];
 
 export async function seedEvaluationCases() {
   await ensureDemoKnowledgeBase();
   const db = await getDb();
   if (!db) throw new Error("数据库暂不可用");
-  const existing = await db.select({ id: evaluationCases.id }).from(evaluationCases).limit(1);
-  if (existing.length > 0) return { seeded: false, reason: "cases_exist" as const };
   const documents = await db.select().from(knowledgeDocuments);
+  const existing = await db.select({ question: evaluationCases.question }).from(evaluationCases);
+  const existingQuestions = new Set(existing.map(item => item.question));
+  let createdCount = 0;
   for (const blueprint of demoEvaluationBlueprints) {
+    if (existingQuestions.has(blueprint.question)) continue;
     const document = blueprint.requiredDocumentTitle ? documents.find(item => item.title === blueprint.requiredDocumentTitle) : undefined;
     await db.insert(evaluationCases).values({
       caseType: blueprint.caseType,
@@ -217,8 +221,9 @@ export async function seedEvaluationCases() {
       requiredCitationDocumentId: document?.id ?? null,
       isActive: 1,
     });
+    createdCount += 1;
   }
-  return { seeded: true, reason: "created" as const };
+  return { seeded: createdCount > 0, reason: createdCount > 0 ? "created" as const : "cases_exist" as const };
 }
 
 export async function runFixedEvaluation() {
@@ -244,9 +249,12 @@ export async function runFixedEvaluation() {
     } else if (testCase.caseType === "own_order") {
       actualIntent = "own_order";
       actualOutcome = "login_required";
-    } else {
+    } else if (testCase.caseType === "cross_user_order") {
       actualIntent = "own_order";
       actualOutcome = decideOrderAccess({ orderOwnerUserId: 1, actorUserId: 2, isAdmin: false }).allowed ? "allowed" : "denied";
+    } else {
+      actualIntent = "human_handoff";
+      actualOutcome = "handoff";
     }
     const latencyMs = Date.now() - startedAt;
     const observation = {
@@ -543,6 +551,54 @@ export async function writeAuditLog(input: {
     outcome: input.outcome,
     reason: input.reason ?? null,
   });
+}
+
+export async function createSupportTicket(input: {
+  userId: number;
+  category: "policy" | "order" | "security" | "other";
+  sourceMessage: string;
+  summary: string;
+  workflowTrace: Array<{ stage: string; detail: string }>;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const ticketCode = `CM-SUP-${nanoid(7).toUpperCase()}`;
+  await db.insert(supportTickets).values({
+    ticketCode,
+    userId: input.userId,
+    category: input.category,
+    status: "open",
+    sourceMessage: input.sourceMessage.trim().slice(0, 500),
+    summary: input.summary.trim().slice(0, 500),
+    workflowTraceJson: input.workflowTrace,
+    isDemo: 1,
+  });
+  const created = await db.select().from(supportTickets).where(eq(supportTickets.ticketCode, ticketCode)).limit(1);
+  const ticket = created[0];
+  if (!ticket) throw new Error("模拟工单创建失败");
+  await writeAuditLog({
+    actorUserId: input.userId,
+    action: "support_ticket.create",
+    resourceType: "support_ticket",
+    resourceId: String(ticket.id),
+    outcome: "allowed",
+    reason: input.category,
+  });
+  return ticket;
+}
+
+export async function listSupportTicketsForUser(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const tickets = await db.select().from(supportTickets).where(eq(supportTickets.userId, userId)).orderBy(desc(supportTickets.createdAt));
+  await writeAuditLog({
+    actorUserId: userId,
+    action: "support_ticket.list",
+    resourceType: "support_ticket",
+    outcome: "allowed",
+    reason: "own_tickets_only",
+  });
+  return tickets;
 }
 
 async function getOrderWithItems(orderId: number) {

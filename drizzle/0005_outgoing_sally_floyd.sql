@@ -1,0 +1,1 @@
+ALTER TABLE `evaluationCases` MODIFY COLUMN `caseType` enum('policy','no_match','product','own_order','cross_user_order','handoff') NOT NULL;
