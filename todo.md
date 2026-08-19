@@ -65,3 +65,7 @@
 - [x] Add cross-service tests, runtime verification, and engineering/interview log entries for expected failure modes and operational trade-offs.
 - [x] Add an automated Node-to-FastAPI integration test that proves the Python route result is consumed while order identity remains within the Node gateway.
 - [x] Document the automated cross-service verification command and successful result alongside the existing runtime curl evidence.
+- [x] Select a production-appropriate pretrained Chinese embedding model with documented size, license, CPU/runtime limits, and reproducible model source.
+- [x] Replace the Python Agent hash embedding with the selected pretrained Chinese embedding model while preserving Chroma citations and Node safety fallback.
+- [x] Add retrieval comparison tests and measurements demonstrating semantic-query behavior, model availability fallback, and unchanged order-data boundaries.
+- [x] Update baseline, capability audit, resume-ready description, runtime contract, and engineering/interview log with only verified embedding claims and operational trade-offs.

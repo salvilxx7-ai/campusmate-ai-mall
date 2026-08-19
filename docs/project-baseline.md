@@ -16,14 +16,14 @@ CampusMate 不是一个只展示页面效果的商城 Demo，而是一套用于�
 
 ## 2. 当前真实技术边界
 
-当前项目是 **React 19 + TypeScript + Tailwind CSS + Express 4 + tRPC 11 + Drizzle ORM + MySQL/TiDB + Python FastAPI + LangGraph + Chroma** 双运行时应用。Python 服务只处理公开问题的意图路由与 Chroma 演示规则召回，Node 网关保留 OAuth、LLM 密钥、订单与工单工具；同时保留语料级 TF-IDF/余弦检索作为安全回退。检索、引用、阈值判断、订单所有权与工单权限均由服务端程序控制。
+当前项目是 **React 19 + TypeScript + Tailwind CSS + Express 4 + tRPC 11 + Drizzle ORM + MySQL/TiDB + Python FastAPI + LangGraph + Chroma + FastEmbed ONNX** 双运行时应用。Python 服务只处理公开问题的意图路由与 Chroma 演示规则召回，使用 `BAAI/bge-small-zh-v1.5` 预训练中文语义 Embedding；Node 网关保留 OAuth、LLM 密钥、订单与工单工具，并保留语料级 TF-IDF/余弦检索作为安全回退。检索、引用、阈值判断、订单所有权与工单权限均由服务端程序控制。
 
-> **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph 和 Chroma 项目；但 Chroma 使用确定性哈希向量，不能描述为预训练语义 Embedding 系统。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
+> **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph、Chroma 和预训练中文语义 Embedding 项目，但必须说明它使用 FastEmbed ONNX CPU 运行时与 `BAAI/bge-small-zh-v1.5`，并且管理员上传文档尚未增量同步至 Chroma。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
 
 | 能力 | 当前真实实现 | 不应混淆的替代表述 |
 |---|---|---|
 | 文档处理 | Markdown/TXT 上传；Node 段落聚合分块；Python Chroma 演示语料使用带重叠的滑动窗口。 | 管理员上传文档尚未增量同步至 Chroma。 |
-| 检索 | Python Chroma 的确定性哈希向量 Top-K 与 Node TF-IDF/余弦回退，均返回分数和来源。 | 不是预训练语义 Embedding。 |
+| 检索 | Python Chroma 通过 FastEmbed ONNX 运行 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量 Top-K；Node TF-IDF/余弦仅作回退，均返回分数和来源。 | 固定 5 题演示集为 BGE 4/5、哈希 3/5，不能外推为生产准确率。 |
 | Agent | LangGraph 状态图：接收 → 意图 → Chroma 检索/交还 Node 网关；Node 执行受控工具。 | 不是原生大模型 Function Calling。 |
 | 工具 | 服务端商品检索、本人订单查询和模拟工单创建/查询。 | 工具由业务代码直接受控调用，不是模型任意访问数据库。 |
 | 性能 | 已记录开发服务本地 HTTP 响应基线。 | 不等同于真实浏览器页面加载或生产 SLA。 |

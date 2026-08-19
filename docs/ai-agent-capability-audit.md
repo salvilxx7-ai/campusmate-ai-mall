@@ -5,7 +5,7 @@
 
 ## 结论摘要
 
-CampusMate 已实现一个可运行的、具有引用与权限边界的校园商城客服 Agent。其真实技术路线为 **React + TypeScript + Express/tRPC + MySQL/Drizzle + Python FastAPI + LangGraph + Chroma + Node 侧 TF-IDF/余弦安全回退 + 内置 LLM API**。Chroma 当前使用确定性哈希向量和受版本控制的演示语料，不能被描述为预训练语义 Embedding 系统；也没有证据支持“15 个核心页面”或“页面加载优化至 2 秒内”。
+CampusMate 已实现一个可运行的、具有引用与权限边界的校园商城客服 Agent。其真实技术路线为 **React + TypeScript + Express/tRPC + MySQL/Drizzle + Python FastAPI + LangGraph + Chroma + FastEmbed ONNX + BAAI/bge-small-zh-v1.5 + Node 侧 TF-IDF/余弦安全回退 + 内置 LLM API**。Chroma 当前使用 512 维预训练中文语义向量和受版本控制的演示语料；管理员上传文档尚未增量同步至 Chroma，也没有证据支持“15 个核心页面”或“页面加载优化至 2 秒内”。
 
 ## 逐项核对
 
@@ -13,7 +13,7 @@ CampusMate 已实现一个可运行的、具有引用与权限边界的校园商
 |---|---|---|---|
 | 清洗业务规则、售后、商品资料、FAQ | **已实现（演示范围）** | 基于公开 C2C 原则改写的规则、售后与 FAQ 演示知识文档，并支持管理员上传 Markdown/TXT 文档。 | 保留并扩展结构化来源元数据。 |
 | 滑动窗口分块 | **部分实现** | Node 知识库仍采用确定性段落聚合；Python Chroma 演示语料使用 260 字符、48 字符重叠的滑动窗口。 | 将管理员文档也接入同一可配置窗口并对比召回。 |
-| Embedding + Chroma 向量库 | **部分实现并已增强** | Python FastAPI 服务使用 Chroma 与确定性哈希向量完成公开规则 Top-K 召回；Node 保留 TF-IDF 回退。 | 接入预训练语义 Embedding 后才可声称语义 Embedding 检索。 |
+| Embedding + Chroma 向量库 | **已实现（演示知识库范围）** | Python FastAPI 服务通过 FastEmbed ONNX 使用 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量完成公开规则 Top-K 召回；Node 保留 TF-IDF 回退。固定 5 题演示集为 BGE 4/5、哈希基线 3/5。 | 管理员上传文档尚未增量同步至 Chroma；小样本结果不能外推为生产准确率。 |
 | 带溯源 Prompt、引用、无匹配转人工 | **已实现** | 规则问答将检索证据写入受控 Prompt，页面展示公开来源；低置信问题拒答并转人工建议。 | 增加结构化工具轨迹与工单落库。 |
 | LangGraph 状态流转 | **已实现（公开路由范围）** | Python sidecar 使用 LangGraph 状态图执行接收、意图分流、Chroma 检索/交还 Node 网关步骤。 | 若需多轮可恢复状态，再增加会话持久化与 checkpoint。 |
 | Function Calling 商品/订单/工单工具 | **部分实现并已增强** | 商品检索与本人订单查询为服务端受控工具调用，工作流会返回结构化工具结果；登录用户可持久化仅本人可见的模拟工单。它仍不是大模型原生 Function Calling。 | 若需写原生 Function Calling，应接入支持该能力的模型工具协议并记录调用轨迹。 |

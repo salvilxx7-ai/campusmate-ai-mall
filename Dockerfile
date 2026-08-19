@@ -7,9 +7,12 @@ RUN apt-get update \
 WORKDIR /app
 COPY . .
 
+ENV CAMPUSMATE_EMBEDDING_CACHE=/opt/campusmate-fastembed
+
 RUN npm install -g corepack@latest \
     && corepack pnpm install \
     && pip3 install --break-system-packages --no-cache-dir -r python-agent/requirements.txt \
+    && python3 python-agent/warm_embedding_model.py \
     && corepack pnpm run build
 
 ENV NODE_ENV=production

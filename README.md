@@ -24,7 +24,7 @@ React 19 前端
   → tRPC 类型契约
   → Express 服务 + Manus OAuth 上下文（个人工具与 LLM 密钥）
   → localhost FastAPI + LangGraph（公开意图路由）
-  → Chroma（受版本控制演示规则的本地哈希向量召回）
+  → Chroma（FastEmbed ONNX 驱动的 BGE 中文预训练语义向量召回）
   → MySQL / Drizzle（商品、订单、知识、审计、评测）
   → Node 侧 TF-IDF 安全回退 → 受控 LLM 回答
   → 对象存储（管理员上传的 .md/.txt 规则文档）
@@ -69,7 +69,7 @@ pnpm check
 
 ## 测试覆盖
 
-当前 37 项 TypeScript 测试覆盖 OAuth 登出、管理员过程拒绝、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 网关边界和六案例评测指标聚合；另有 3 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma 与个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
+当前 37 项 TypeScript 测试覆盖 OAuth 登出、管理员过程拒绝、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 网关边界和六案例评测指标聚合；另有 4 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回与个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
 
 ## 项目理解与面试复盘
 

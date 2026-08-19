@@ -41,7 +41,7 @@ POST /v1/route
 
 ## 3. 知识与模型边界
 
-Chroma 在本阶段仅存放由公开 C2C 规则改写的**演示知识库**，使用可复现的哈希向量完成本地向量检索。它是实际的 Chroma 集成，但不是生产级预训练语义 Embedding 服务。受控回答继续由 Node 侧的内置 LLM 客户端生成，保证密钥仅保留在现有服务端信任边界。
+Chroma 在本阶段仅存放由公开 C2C 规则改写的**演示知识库**，通过 FastEmbed ONNX CPU 使用 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量完成本地向量检索。Node 保留 TF-IDF 作为启动、下载或模型加载失败时的受控回退。管理员上传文档尚未增量同步至 Chroma；受控回答继续由 Node 侧的内置 LLM 客户端生成，保证密钥仅保留在现有服务端信任边界。
 
 ## 4. 已预期问题与应对
 
@@ -50,7 +50,8 @@ Chroma 在本阶段仅存放由公开 C2C 规则改写的**演示知识库**，�
 | WebDev 默认镜像没有 Python | 当前项目原本是 Node 单运行时。 | 使用自定义 Dockerfile 安装 Python 与 requirements；本地开发由 Node 管理子进程。 | 多运行时部署需要明确构建、健康检查与退出清理。 |
 | Chroma 容器存储易失 | Autoscale 容器的本地文件系统不是持久数据源。 | 启动时从受版本控制的公开演示语料重建；生产知识库仍以 MySQL/对象存储为事实源。 | 向量库不能被当作唯一数据源。 |
 | 跨服务泄露身份 | 若浏览器直接调用 Python，攻击者可伪造用户 ID。 | Python 只监听 localhost；Node 认证后才执行任何个人数据工具。 | 最小权限：编排服务不拥有订单权限。 |
-| Python 服务启动晚于 Node | 首个请求可能遇到 sidecar 尚未就绪。 | Node 使用 1.8 秒超时和 TF-IDF 安全 fallback；实际首个请求验证会触发 FastAPI 启动，后续请求进入 LangGraph/Chroma 工作流。 | 依赖不可用时系统应退化而非泄露或阻塞订单能力。 |
+| Python 服务启动晚于 Node 或 BGE 需要下载 | 首个请求可能遇到 sidecar 尚未就绪或模型缓存缺失。 | Node 使用 1.8 秒超时和 TF-IDF 安全 fallback；Docker 构建期执行 BGE 预热，后续请求进入 LangGraph/Chroma 语义检索工作流。 | 依赖不可用时系统应退化而非泄露或阻塞订单能力。 |
+| BGE sidecar 与 Node 构建竞争内存 | 开发环境中并发运行 sidecar 与 Vite 构建曾导致构建退出码 143。 | 生产构建前停止可按需重启的 sidecar，并以 `NODE_OPTIONS=--max-old-space-size=1280` 构建成功；部署后应监控内存并考虑将 Embedding 拆分至独立运行时。 | 模型引入不仅是检索精度变化，也是容量规划问题。 |
 | LLM 密钥被多运行时复制 | 把 Forge key 放到 Python 服务会扩大暴露面。 | Python 不调用 LLM，Node 保留现有受控 LLM 网关。 | 密钥与个人工具都放在最小必要边界。 |
 
 ## 5. 自动化验证证据

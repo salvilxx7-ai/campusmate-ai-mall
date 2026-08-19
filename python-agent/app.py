@@ -3,18 +3,22 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 from typing import Annotated, Literal, TypedDict
 
 import chromadb
+from fastembed import TextEmbedding
 from fastapi import FastAPI
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, Field
 
 BASE_DIR = Path(__file__).resolve().parent
-VECTOR_DIMENSION = 96
+EMBEDDING_MODEL = os.getenv("CAMPUSMATE_EMBEDDING_MODEL", "BAAI/bge-small-zh-v1.5")
+EMBEDDING_CACHE = os.getenv("CAMPUSMATE_EMBEDDING_CACHE", "/tmp/campusmate-fastembed")
+EMBEDDING_DIMENSION = 512
 TOP_K = 3
-GROUNDING_THRESHOLD = 0.18
+GROUNDING_THRESHOLD = 0.25
 
 
 class RouteRequest(BaseModel):
@@ -40,6 +44,8 @@ class RouteResponse(BaseModel):
     citations: list[Citation]
     handoff: bool
     runtime: Literal["fastapi-langgraph-chroma"] = "fastapi-langgraph-chroma"
+    embeddingModel: str
+    embeddingBackend: Literal["fastembed-bge", "legacy-hash-fallback"]
 
 
 class AgentState(TypedDict, total=False):
@@ -50,16 +56,16 @@ class AgentState(TypedDict, total=False):
     handoff: bool
 
 
-def hash_embedding(text: str) -> list[float]:
-    """Deterministic local embedding for demo-only Chroma retrieval; not a semantic model."""
-    values = [0.0] * VECTOR_DIMENSION
+def legacy_hash_embedding(text: str) -> list[float]:
+    """Emergency-only fallback when a public pretrained model cannot be loaded."""
+    values = [0.0] * EMBEDDING_DIMENSION
     normalized = "".join(text.lower().split())
     tokens = [normalized[index : index + 2] for index in range(max(0, len(normalized) - 1))]
     if not tokens and normalized:
         tokens = [normalized]
     for token in tokens:
         digest = hashlib.sha256(token.encode("utf-8")).digest()
-        bucket = int.from_bytes(digest[:4], "big") % VECTOR_DIMENSION
+        bucket = int.from_bytes(digest[:4], "big") % EMBEDDING_DIMENSION
         values[bucket] += 1.0
     magnitude = math.sqrt(sum(value * value for value in values))
     return [round(value / magnitude, 8) for value in values] if magnitude else values
@@ -95,6 +101,27 @@ def classify(message: str) -> Literal["policy_qa", "product_search", "own_order"
     return "policy_qa"
 
 
+def build_embedding_runtime():
+    try:
+        model = TextEmbedding(model_name=EMBEDDING_MODEL, cache_dir=EMBEDDING_CACHE, threads=1)
+        vector = next(model.embed(["CampusMate 中文规则检索健康检查"], batch_size=1))
+        if len(vector) != EMBEDDING_DIMENSION:
+            raise RuntimeError(f"预训练模型向量维度异常：{len(vector)}")
+        return model, "fastembed-bge"
+    except Exception as error:
+        print(f"[Embedding] 无法加载 {EMBEDDING_MODEL}，启用受控哈希回退：{error}")
+        return None, "legacy-hash-fallback"
+
+
+EMBEDDER, EMBEDDING_BACKEND = build_embedding_runtime()
+
+
+def encode_texts(texts: list[str]) -> list[list[float]]:
+    if EMBEDDER is None:
+        return [legacy_hash_embedding(text) for text in texts]
+    return [vector.tolist() for vector in EMBEDDER.embed(texts, batch_size=min(16, max(1, len(texts))))]
+
+
 def build_collection():
     client = chromadb.EphemeralClient()
     collection = client.get_or_create_collection(name="campusmate_public_demo_knowledge", metadata={"hnsw:space": "cosine"})
@@ -112,7 +139,7 @@ def build_collection():
                 "sourceLabel": document["sourceLabel"],
                 "sourceUrl": document["sourceUrl"],
             })
-            embeddings.append(hash_embedding(content))
+            embeddings.append(encode_texts([content])[0])
     collection.add(ids=ids, documents=texts, metadatas=metadatas, embeddings=embeddings)
     return collection
 
@@ -136,7 +163,7 @@ def route_after_intent(state: AgentState) -> str:
 
 
 def retrieve_policy(state: AgentState) -> AgentState:
-    result = COLLECTION.query(query_embeddings=[hash_embedding(state["message"])], n_results=TOP_K, include=["documents", "metadatas", "distances"])
+    result = COLLECTION.query(query_embeddings=[encode_texts([state["message"]])[0]], n_results=TOP_K, include=["documents", "metadatas", "distances"])
     citations: list[dict[str, object]] = []
     documents = result.get("documents", [[]])[0] or []
     metadatas = result.get("metadatas", [[]])[0] or []
@@ -153,7 +180,7 @@ def retrieve_policy(state: AgentState) -> AgentState:
             })
     workflow = state.get("workflow", []) + [{
         "stage": "retrieval",
-        "detail": f"Chroma 使用本地确定性哈希向量召回 {len(citations)} 条超过阈值的公开演示证据。",
+        "detail": f"Chroma 使用 {EMBEDDING_MODEL} 的预训练中文语义向量召回 {len(citations)} 条超过阈值的公开演示证据。" if EMBEDDING_BACKEND == "fastembed-bge" else f"预训练模型不可用，Chroma 使用受控哈希回退召回 {len(citations)} 条证据。",
     }]
     if not citations:
         workflow.append({"stage": "handoff_ready", "detail": "检索证据不足，要求业务网关走安全转人工分支。"})
@@ -184,7 +211,14 @@ agent_graph = graph.compile()
 
 @app.get("/health")
 def health() -> dict[str, object]:
-    return {"status": "ok", "runtime": "fastapi-langgraph-chroma", "knowledgeChunkCount": COLLECTION.count()}
+    return {
+        "status": "ok",
+        "runtime": "fastapi-langgraph-chroma",
+        "knowledgeChunkCount": COLLECTION.count(),
+        "embeddingModel": EMBEDDING_MODEL,
+        "embeddingBackend": EMBEDDING_BACKEND,
+        "embeddingDimension": EMBEDDING_DIMENSION,
+    }
 
 
 @app.post("/v1/route", response_model=RouteResponse)
@@ -195,4 +229,6 @@ def route_message(request: RouteRequest) -> RouteResponse:
         workflow=[WorkflowStep(**step) for step in result.get("workflow", [])],
         citations=[Citation(**citation) for citation in result.get("citations", [])],
         handoff=bool(result.get("handoff", False)),
+        embeddingModel=EMBEDDING_MODEL,
+        embeddingBackend=EMBEDDING_BACKEND,
     )
