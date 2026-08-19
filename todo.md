@@ -59,3 +59,9 @@
 - [x] Create a durable Markdown baseline defining CampusMate goals, demonstrable boundaries, acceptance criteria, and non-negotiable truthfulness rules.
 - [x] Create a feature-by-feature engineering log covering business process, implementation route, expected failures, response playbooks, and interview deep-dive prompts.
 - [x] Establish and document the rule that every subsequent feature change updates both baseline requirements and the engineering/interview log before checkpointing.
+- [x] Define the FastAPI/LangGraph/Chroma service contract, process model, authentication handoff, data ownership boundary, and production runtime limitations.
+- [x] Implement a Python FastAPI service with a LangGraph state graph and Chroma-backed retrieval endpoint using only public demo knowledge.
+- [x] Safely connect the existing Node/tRPC backend to the Python Agent without exposing client-supplied identities or credentials to tool execution.
+- [x] Add cross-service tests, runtime verification, and engineering/interview log entries for expected failure modes and operational trade-offs.
+- [x] Add an automated Node-to-FastAPI integration test that proves the Python route result is consumed while order identity remains within the Node gateway.
+- [x] Document the automated cross-service verification command and successful result alongside the existing runtime curl evidence.

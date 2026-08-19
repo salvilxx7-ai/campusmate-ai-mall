@@ -1,9 +1,10 @@
 import * as db from "../db";
 import { invokeLLM } from "../_core/llm";
 import { decideGrounding } from "./grounding";
+import { routeWithPythonAgent, type PythonAgentRoute } from "./pythonAgentGateway";
 
 export type CustomerIntent = "policy_qa" | "product_search" | "own_order" | "human_handoff";
-export type WorkflowStage = "received" | "intent_routed" | "tool_invoked" | "answer_generated" | "handoff_ready";
+export type WorkflowStage = "received" | "intent_routed" | "retrieval" | "tool_invoked" | "answer_generated" | "handoff_ready";
 export type WorkflowStep = { stage: WorkflowStage; detail: string };
 export type ToolResult = { tool: "knowledge_search" | "product_search" | "own_order_lookup" | "handoff_advice"; status: "completed" | "blocked" | "not_found"; summary: string };
 
@@ -34,9 +35,11 @@ function handoff(workflow: WorkflowStep[], tools: ToolResult[], detail: string) 
   tools.push({ tool: "handoff_advice", status: "completed", summary: "已准备模拟人工转接所需的对话摘要与处理建议。" });
 }
 
-async function answerPolicyQuestion(message: string, workflow: WorkflowStep[], tools: ToolResult[]) {
-  append(workflow, "tool_invoked", "调用知识库检索工具，按语料级 TF-IDF/余弦相似度召回 Top-3 证据。" );
-  const evidence = await db.searchKnowledgeBase(message);
+async function answerPolicyQuestion(message: string, workflow: WorkflowStep[], tools: ToolResult[], pythonRoute?: PythonAgentRoute) {
+  append(workflow, "tool_invoked", pythonRoute ? "采用 FastAPI/LangGraph/Chroma 返回的公开证据，Node 网关保留回答与业务权限控制。" : "调用本地知识库检索工具，按语料级 TF-IDF/余弦相似度召回 Top-3 证据。" );
+  const evidence = pythonRoute?.citations.length
+    ? pythonRoute.citations.map((citation, index) => ({ documentId: -(index + 1), title: citation.title, content: citation.excerpt, sourceLabel: citation.sourceLabel, sourceUrl: citation.sourceUrl, score: citation.score }))
+    : await db.searchKnowledgeBase(message);
   const grounding = decideGrounding(evidence, message);
   if (!grounding.grounded) {
     tools.push({ tool: "knowledge_search", status: "not_found", summary: "未检索到满足置信阈值的公开规则证据。" });
@@ -78,9 +81,15 @@ async function answerPolicyQuestion(message: string, workflow: WorkflowStep[], t
 export async function answerCustomerMessage(input: { message: string; actor?: { id: number } }) {
   const workflow: WorkflowStep[] = [];
   const toolResults: ToolResult[] = [];
-  append(workflow, "received", "接收用户问题，进入受控客服工作流。" );
-  const intent = classifyCustomerIntent(input.message);
-  append(workflow, "intent_routed", `识别意图：${intent}。` );
+  const pythonRoute = await routeWithPythonAgent(input.message);
+  const intent = pythonRoute?.intent ?? classifyCustomerIntent(input.message);
+  if (pythonRoute) {
+    workflow.push(...pythonRoute.workflow);
+    append(workflow, "tool_invoked", "Node 网关接收 Python 路由结果；个人数据工具仍需经过 OAuth 会话校验。" );
+  } else {
+    append(workflow, "received", "接收用户问题，进入受控客服工作流。" );
+    append(workflow, "intent_routed", `本地安全回退识别意图：${intent}。` );
+  }
 
   if (intent === "human_handoff") {
     handoff(workflow, toolResults, "用户主动请求人工支持。" );
@@ -130,6 +139,6 @@ export async function answerCustomerMessage(input: { message: string; actor?: { 
     return { intent, answer: orders.length ? `你当前有 ${orders.length} 笔模拟订单。请提供“订单 订单号”以查询具体订单。` : "你还没有模拟订单。你可以先浏览商品并完成一次演示下单。", citations: [], handoff: false, orders, workflow, toolResults };
   }
 
-  const policy = await answerPolicyQuestion(input.message, workflow, toolResults);
+  const policy = await answerPolicyQuestion(input.message, workflow, toolResults, pythonRoute ?? undefined);
   return { intent, ...policy, workflow, toolResults };
 }

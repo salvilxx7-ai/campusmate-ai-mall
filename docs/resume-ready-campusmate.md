@@ -1,35 +1,34 @@
 # CampusMate｜简历可用项目表述（基于已验证实现）
 
-> 使用前提：以下表述只对应当前仓库中已经运行、测试或记录过的能力。若简历需要写 Python、FastAPI、LangGraph、Chroma、Embedding、PHP、15 个核心页面或“页面加载 2 秒内”，应先完成相应实现和测量，不能把它们混入本版本描述。
+> 使用前提：以下表述只对应当前仓库中已经运行、测试或记录过的能力。当前可以写 Python、FastAPI、LangGraph 和 Chroma；但不能写预训练语义 Embedding、PHP、15 个核心页面或“页面加载 2 秒内”，因为这些尚未完成对应实现或测量。
 
 ## 一行项目定位
 
-**CampusMate 校园二手商城与可溯源 AI 客服**｜面向校园二手交易的 TypeScript 全栈作品集项目，将模拟订单隔离、基于公开规则的 RAG 客服、受控工具调用、模拟人工工单与可复现评测整合为可讲解的 AI 应用工程闭环。
+**CampusMate 校园二手商城与可溯源 AI 客服**｜面向校园二手交易的 Node + Python 双运行时作品集项目，将模拟订单隔离、基于公开规则的 RAG 客服、受控工具调用、模拟人工工单与可复现评测整合为可讲解的 AI 应用工程闭环。
 
 ## 技术栈
 
-**React 19、TypeScript、Vite、Tailwind CSS、Express 4、tRPC 11、Drizzle ORM、MySQL/TiDB、Manus OAuth、TF-IDF/余弦检索、内置 LLM API、对象存储、Vitest。**
+**React 19、TypeScript、Vite、Tailwind CSS、Express 4、tRPC 11、Drizzle ORM、MySQL/TiDB、Manus OAuth、Python、FastAPI、LangGraph、Chroma、TF-IDF/余弦检索、确定性哈希向量、内置 LLM API、对象存储、Vitest。**
 
 ## 简历项目经历版本
 
 **CampusMate 校园二手商城与可溯源 AI 客服｜个人作品集项目**
 
 - 设计并实现校园二手商城前台、模拟下单、个人订单/个人中心与管理员后台；通过 Manus OAuth 和服务端 tRPC 过程按当前会话限定订单、发布物品与工单查询，越权订单读取会被拒绝并写入追加式审计日志。
-- 构建公开 C2C 规则改写的演示知识库，支持 Markdown/TXT 文档上传、确定性分块与语料级 TF-IDF/余弦 Top-3 检索；将检索片段注入受控 Prompt，规则回答附公开来源，低置信检索明确拒答并引导人工支持。
-- 实现显式客服 Agent 工作流，返回“接收问题—意图分流—规则/商品/本人订单工具调用—答案或转人工准备”轨迹；商品与订单工具均在服务端执行，会话未登录或所有权不通过时阻止数据读取。
-- 新增模拟人工工单闭环：登录用户可保存转人工上下文、回答摘要与工作流轨迹，并只查询本人记录；固定评测覆盖规则、无匹配、商品、本人订单、跨账户订单与人工转接 6 类场景。当前 35 项自动化测试通过。
+- 构建公开 C2C 规则改写的演示知识库，支持 Markdown/TXT 文档上传、Node 侧 TF-IDF/余弦安全回退，以及 Python FastAPI + Chroma 的确定性哈希向量 Top-K 召回；将引用片段注入受控 Prompt，低置信检索明确拒答并引导人工支持。
+- 使用 LangGraph 实现“接收问题—意图分流—公开规则检索/业务网关”状态图；FastAPI 只接收公开问题，Node 网关保留 OAuth 会话、LLM 密钥与商品/本人订单/工单工具，避免跨服务复制个人数据权限。
+- 新增模拟人工工单闭环：登录用户可保存转人工上下文、回答摘要与工作流轨迹，并只查询本人记录；固定评测覆盖规则、无匹配、商品、本人订单、跨账户订单与人工转接 6 类场景。当前 37 项 TypeScript 测试与 3 项 Python Agent 测试通过。
 
 ## 面试时的诚实说明
 
-当前版本的检索层是**可复现的词项向量检索**，不是 Embedding/Chroma；Agent 是**显式 TypeScript 工作流**，不是 LangGraph。这样选型的原因是首版希望保持零外部向量服务、可审计、可稳定演示。后续架构会保留文档、引用、工具与评测接口，将检索适配层替换为 Embedding/向量数据库，并将工作流迁移到独立 Python 服务。
+当前版本已使用 **Python FastAPI + LangGraph + Chroma**：Python 服务以 localhost sidecar 形式处理公开意图与规则检索，Chroma 使用受版本控制演示语料和确定性哈希向量，Node 侧继续保留 TF-IDF 安全回退、OAuth、个人数据工具和 LLM 密钥。它不是预训练语义 Embedding 服务，也不是大模型原生 Function Calling；这些限制应主动向面试官说明。
 
 ## 差距补齐优先级
 
 | 优先级 | 工作项 | 产出与验收标准 | 完成后可新增的真实表述 |
 |---|---|---|---|
-| P0 | 新建独立 Python/FastAPI 服务，并将客服请求改由其处理。 | API 合约、鉴权转发、Docker/部署说明、集成测试均存在。 | Python、FastAPI 服务化 Agent。 |
-| P0 | 在该服务内使用 LangGraph 构建真实状态图。 | 图节点、条件边、工具节点、持久化状态与端到端测试可运行。 | LangGraph 状态流转与工具编排。 |
-| P1 | 接入真实 Embedding 模型与 Chroma（或等价向量库），对已有知识文档重建索引。 | 文档入库、向量召回、TopK/阈值配置、离线对比报告齐全。 | Embedding、Chroma 向量检索。 |
+| P0 | 接入预训练中文 Embedding 并替换当前哈希向量，对已有知识文档重建索引。 | 文档入库、向量召回、TopK/阈值配置、离线对比报告齐全。 | 预训练语义 Embedding 检索。 |
+| P1 | 将 Chroma 索引与管理员上传知识库做增量同步，并把持久化事实源留在 MySQL/对象存储。 | 文档版本、重建任务、失败重试和索引一致性测试齐全。 | 可运维的向量索引同步。 |
 | P1 | 用浏览器真实设备与网络条件采集 Web Vitals。 | 保留 Lighthouse/Performance 原始报告与采样脚本。 | 仅依据报告写加载或交互性能指标。 |
 | P2 | 为工单补充管理员处理队列、状态变更和通知模拟。 | 状态流转权限测试、审计与可视化队列。 | 工单提交与处理闭环。 |
 

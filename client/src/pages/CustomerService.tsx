@@ -11,12 +11,12 @@ import { useState } from "react";
 import { Link } from "wouter";
 
 type Citation = { documentId: number; title: string; excerpt: string; sourceLabel: string; sourceUrl: string; score: number };
-type WorkflowStep = { stage: "received" | "intent_routed" | "tool_invoked" | "answer_generated" | "handoff_ready"; detail: string };
+type WorkflowStep = { stage: "received" | "intent_routed" | "retrieval" | "tool_invoked" | "answer_generated" | "handoff_ready"; detail: string };
 type ToolResult = { tool: "knowledge_search" | "product_search" | "own_order_lookup" | "handoff_advice"; status: "completed" | "blocked" | "not_found"; summary: string };
 type Intent = "policy_qa" | "product_search" | "own_order" | "human_handoff";
 
 const prompts = ["什么商品不能上架？", "签收后可以无理由退换吗？", "我想查一下我的订单", "有没有适合复习的教材？"];
-const stageLabel: Record<WorkflowStep["stage"], string> = { received: "接收问题", intent_routed: "意图分流", tool_invoked: "调用工具", answer_generated: "生成回答", handoff_ready: "准备转人工" };
+const stageLabel: Record<WorkflowStep["stage"], string> = { received: "接收问题", intent_routed: "意图分流", retrieval: "Chroma 检索", tool_invoked: "调用工具", answer_generated: "生成回答", handoff_ready: "准备转人工" };
 const toolLabel: Record<ToolResult["tool"], string> = { knowledge_search: "知识检索", product_search: "商品检索", own_order_lookup: "本人订单", handoff_advice: "人工转接" };
 const toolTone: Record<ToolResult["status"], string> = { completed: "bg-emerald-50 text-emerald-700", blocked: "bg-rose-50 text-rose-700", not_found: "bg-amber-50 text-amber-700" };
 
