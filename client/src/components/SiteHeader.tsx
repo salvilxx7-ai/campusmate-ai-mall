@@ -12,7 +12,7 @@ const navItems = [
   { href: "/assistant", label: "AI 客服", icon: Bot },
   { href: "/profile", label: "个人中心", icon: UserRound },
   { href: "/profile/listings", label: "发布管理", icon: Tag },
-  { href: "/project", label: "项目说明", icon: FileText },
+  { href: "/project", label: "服务说明", icon: FileText },
 ];
 
 export function SiteHeader() {
@@ -50,7 +50,7 @@ export function SiteHeader() {
             );
           })}
           {user?.role === "admin" ? (
-            <><Link href="/admin" className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${location.startsWith("/admin") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><LayoutDashboard className="size-3.5" aria-hidden="true" /> 管理台</Link><Link href="/evaluation" className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${location.startsWith("/evaluation") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><BarChart3 className="size-3.5" aria-hidden="true" /> 评测</Link></>
+            <><Link href="/admin" className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${location.startsWith("/admin") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><LayoutDashboard className="size-3.5" aria-hidden="true" /> 管理台</Link><Link href="/evaluation" className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${location.startsWith("/evaluation") ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><BarChart3 className="size-3.5" aria-hidden="true" /> 质量监控</Link></>
           ) : null}
         </nav>
 
@@ -72,7 +72,7 @@ export function SiteHeader() {
                   const active = item.href === "/" ? location === "/" : location.startsWith(item.href);
                   return <SheetClose key={item.href} asChild><Link href={item.href} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><Icon className="size-4" />{item.label}</Link></SheetClose>;
                 })}
-                {user?.role === "admin" ? <><SheetClose asChild><Link href="/admin" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><LayoutDashboard className="size-4" />管理台</Link></SheetClose><SheetClose asChild><Link href="/evaluation" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><BarChart3 className="size-4" />评测</Link></SheetClose></> : null}
+                {user?.role === "admin" ? <><SheetClose asChild><Link href="/admin" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><LayoutDashboard className="size-4" />管理台</Link></SheetClose><SheetClose asChild><Link href="/evaluation" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><BarChart3 className="size-4" />质量监控</Link></SheetClose></> : null}
               </nav>
               <SheetFooter className="border-t border-border p-4">
                 {!isAuthenticated ? <div className="grid w-full gap-2"><SheetClose asChild><Link href="/login" className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground">普通用户注册 / 登录</Link></SheetClose><SheetClose asChild><Link href="/admin" className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-background px-4 text-sm font-medium text-foreground">管理员登录</Link></SheetClose></div> : <p className="px-2 text-sm text-muted-foreground">当前登录：{user?.name ?? "校园用户"}</p>}

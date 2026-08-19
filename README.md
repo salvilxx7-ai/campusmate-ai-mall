@@ -70,7 +70,7 @@ pnpm check
 
 ## 测试覆盖
 
-当前 69 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、普通用户图片格式/体积校验、发布认证、待审核公开隔离、发布状态机、本人编辑/撤回/重提、管理员批量审核权限及部分跳过、管理员用户目录拒绝、角色自改/最后管理员保护、原生 Function Calling 的成功/授权拒绝/回退测量、管理员工单队列拒绝与状态耗时、固定检索 Recall@K/MRR、预览参数下的 API JSON 回退、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
+当前 70 项 TypeScript 测试覆盖 OAuth 登出与受限登录回跳、本人资料会话归属、普通用户图片格式/体积校验、发布认证、待审核公开隔离、发布状态机、本人编辑/撤回/重提、管理员批量审核权限及部分跳过、管理员用户目录拒绝、角色自改/最后管理员保护、原生 Function Calling 的成功/授权拒绝/回退测量、管理员工单队列拒绝与状态耗时、固定检索 Recall@K/MRR、预览参数下的 API JSON 回退、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序、Node-to-FastAPI 索引网关边界、真实管理员 tRPC 上传/重试同步、规则版本替换/运行时 bootstrap/失效清理和六案例评测指标聚合，以及产品界面文案回归；另有 7 项 Python Agent 测试验证 FastAPI、LangGraph、Chroma、BGE 中文语义召回、文档幂等 upsert 与删除、公开来源限制和个人数据零接触边界。运行 `pnpm test:all` 可验证完整测试集。
 
 ## 项目理解与面试复盘
 
@@ -78,6 +78,8 @@ pnpm check
 
 - [`docs/project-baseline.md`](./docs/project-baseline.md)：项目目标、业务验收、真实技术边界、非功能要求与每轮开发的强制复盘流程。
 - [`docs/engineering-and-interview-log.md`](./docs/engineering-and-interview-log.md)：逐模块业务流程、数据流、失败处理、工程取舍与面试深挖问答。
+- [`docs/technical-delivery-guide.md`](./docs/technical-delivery-guide.md)：交付级技术清单、数据模型、端到端业务流程、安全边界、关键代码摘录、测试与运行命令。
+- [`docs/requirements-and-architecture.md`](./docs/requirements-and-architecture.md)：产品需求、验收条件、架构选择与非功能边界。
 - [`docs/end-to-end-business-flow.md`](./docs/end-to-end-business-flow.md)：从公开浏览、模拟下单、订单隔离、AI 工具、工单到管理员增量索引的完整业务流与答辩顺序。
 - [`docs/ai-agent-capability-audit.md`](./docs/ai-agent-capability-audit.md)：用户目标陈述与当前实现的真实性核对。
 - [`docs/target-rag-agent-claim-audit.md`](./docs/target-rag-agent-claim-audit.md)：目标 RAG Agent 要求、当前实现证据、可用表述与不得虚构边界的逐项核验。

@@ -1,5 +1,7 @@
 # CampusMate 全流程业务、数据流与面试深挖总览
 
+> **交付阅读提示：** 本文记录页面到数据变化的完整业务顺序。若需要查看每个模块实际使用的框架、服务、表、状态机、代码摘录、测试命令与运行边界，请先阅读 [`technical-delivery-guide.md`](./technical-delivery-guide.md)；需求范围与验收条件见 [`requirements-and-architecture.md`](./requirements-and-architecture.md)。
+
 ## 如何使用本文件
 
 本文件用于回答面试中最容易连续追问的五类问题：**用户从哪里进入、每一步写了什么数据、谁能读取、失败时怎么办、为什么这样设计**。演示时不必逐字背诵；应按用户路径打开对应页面，再用下表解释服务端约束。

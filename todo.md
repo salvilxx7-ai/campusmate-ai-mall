@@ -112,3 +112,7 @@
 - [x] Implement current-user-only editing, withdrawal, and resubmission of owned listings with explicit permitted status transitions and append-only audit evidence.
 - [x] Add administrator review-list status filtering plus atomic bulk approval or rejection with per-item outcome reporting and protected role gates.
 - [x] Add listing ownership, lifecycle transition, bulk-review authorization and partial-failure tests; update baseline and engineering/interview materials.
+- [x] Audit all product-facing routes and navigation for interview, evaluation, résumé, defense, or portfolio-oriented wording and identify product-safe replacements.
+- [x] Remove interview-oriented UI copy and navigation from the delivered product while preserving necessary operational, transparency, and administrator experiences.
+- [x] Consolidate requirements, architecture, data model, business flow, security, AI, testing, and runtime decisions into delivery-grade technical documentation with focused code excerpts.
+- [x] Verify UI copy removal, documentation-code consistency, responsive rendering, type checks, tests, production build, and checkpoint materials.
