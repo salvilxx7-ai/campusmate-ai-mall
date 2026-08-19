@@ -105,6 +105,8 @@ jspm_packages/
 tmp/
 temp/
 docs/assets/*.mp4
+private-materials/
+.personal/
 
 # Database
 *.db

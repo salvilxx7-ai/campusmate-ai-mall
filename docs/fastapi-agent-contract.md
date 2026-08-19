@@ -45,7 +45,7 @@ Chroma 在本阶段仅存放由公开 C2C 规则改写的**演示知识库**，�
 
 ## 4. 已预期问题与应对
 
-| 风险 | 为什么会出现 | 应对方案 | 面试应答重点 |
+| 风险 | 为什么会出现 | 应对方案 | 维护要点 |
 |---|---|---|---|
 | WebDev 默认镜像没有 Python | 当前项目原本是 Node 单运行时。 | 使用自定义 Dockerfile 安装 Python 与 requirements；本地开发由 Node 管理子进程。 | 多运行时部署需要明确构建、健康检查与退出清理。 |
 | Chroma 容器存储易失 | Autoscale 容器的本地文件系统不是持久数据源。 | Node 在新的 `runtimeInstanceId` 首次接收公开规则请求前，逐份 bootstrap `active + ready + synced` 文档；MySQL/对象存储仍是事实源。 | 向量库不能被当作唯一数据源；bootstrap 成功只代表当前运行实例已恢复。 |
@@ -61,4 +61,4 @@ pnpm test:all
 pnpm check
 ```
 
-当前结果为 **63 项 TypeScript 测试与 7 项 Python Agent 测试通过**。其中 `server/agent/pythonAgentGateway.integration.test.ts` 通过 mock FastAPI 地址验证两条跨服务契约：第一，Node 仅向 Python 发送 `{ message }`，并消费 LangGraph/Chroma 返回的公开证据；第二，匿名订单意图即使已被 Python 路由，仍由 Node 保持登录门槛，不会向 Python 发送身份或订单数据。`knowledgeLifecycle.router.integration.test.ts` 进一步覆盖“新版本先同步、旧版本 supersede、运行时 bootstrap、失效删除后不再引用”的端到端链路；`auth.oauthReturnPath.test.ts` 验证 OAuth 回调不能被外部跳转目标利用。原生工具调用的成功/拒绝/回退测量、资料编辑、用户发布图片策略、角色管理、工单队列与固定检索质量测试均停留在 Node/tRPC 与 MySQL 边界，绝不向 Python 转发身份字段、角色变更或工单处理数据。
+当前结果为 **72 项 TypeScript 测试与 7 项 Python Agent 测试通过**。其中 `server/agent/pythonAgentGateway.integration.test.ts` 通过 mock FastAPI 地址验证两条跨服务契约：第一，Node 仅向 Python 发送 `{ message }`，并消费 LangGraph/Chroma 返回的公开证据；第二，匿名订单意图即使已被 Python 路由，仍由 Node 保持登录门槛，不会向 Python 发送身份或订单数据。`knowledgeLifecycle.router.integration.test.ts` 进一步覆盖“新版本先同步、旧版本 supersede、运行时 bootstrap、失效删除后不再引用”的端到端链路；`auth.oauthReturnPath.test.ts` 验证 OAuth 回调不能被外部跳转目标利用。原生工具调用的成功/拒绝/回退测量、资料编辑、用户发布图片策略、角色管理、工单队列与固定检索质量测试均停留在 Node/tRPC 与 MySQL 边界，绝不向 Python 转发身份字段、角色变更或工单处理数据。

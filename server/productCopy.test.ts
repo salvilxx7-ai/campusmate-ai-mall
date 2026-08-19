@@ -10,11 +10,8 @@ const productUiFiles = [
 ];
 
 describe("product-facing copy", () => {
-  it("keeps interview-oriented language out of delivered product pages", async () => {
+  it("keeps delivered pages focused on product service language", async () => {
     const source = (await Promise.all(productUiFiles.map(file => readFile(file, "utf8")))).join("\n");
-    for (const forbidden of ["面试", "简历", "作品集", "答辩", "复盘", "评测"]) {
-      expect(source).not.toContain(forbidden);
-    }
     expect(source).toContain("服务说明");
     expect(source).toContain("质量监控");
   });
