@@ -49,6 +49,7 @@ export const products = mysqlTable(
     priceCents: int("priceCents").notNull(),
     condition: mysqlEnum("condition", ["excellent", "good", "fair"]).notNull(),
     status: mysqlEnum("status", ["active", "reserved", "archived"]).default("active").notNull(),
+    sellerUserId: int("sellerUserId").references(() => users.id),
     sellerLabel: varchar("sellerLabel", { length: 80 }).notNull(),
     isDemo: int("isDemo").default(1).notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -56,6 +57,7 @@ export const products = mysqlTable(
   },
   table => [
     index("products_category_status_idx").on(table.categoryId, table.status),
+    index("products_seller_status_idx").on(table.sellerUserId, table.status),
     index("products_created_at_idx").on(table.createdAt),
   ]
 );

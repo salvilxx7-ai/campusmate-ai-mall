@@ -36,3 +36,10 @@
 - [x] Verify desktop and mobile UI, product and order flows, security denial path, RAG citation/fallback path, and evaluation panel.
 - [x] Run fixed evaluation end-to-end and verify the panel reflects recorded results.
 - [x] Prepare GitHub publication guide, three-to-five-minute recording script, demo dataset disclosure, README, and interview defense guide.
+- [x] Define the personal-center route, current-user order timeline, owned-listing data boundary, and demo disclosure states.
+- [x] Implement a personal-center page for authenticated users with order timeline, published-item status cards, and clear empty-state guidance.
+- [x] Add server-side current-user listing queries that never expose another user’s published-item data.
+- [x] Verify personal-center access control, desktop/mobile presentation, and the enriched end-to-end demo story.
+- [x] Verify unauthenticated access to `/profile` and capture the login-gated state as validation evidence.
+- [x] Add a route-level test proving `profile.mine` rejects requests without an authenticated session.
+- [x] Document the personal-center walkthrough from browsing through simulated ordering to the reflected order and listing states.

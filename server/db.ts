@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, like, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { nanoid } from "nanoid";
 import {
@@ -406,6 +406,14 @@ async function ensureDemoCatalog() {
   if (existing.length === 0) await seedDemoCatalog();
 }
 
+async function ensureDemoListingOwnership() {
+  const db = await getDb();
+  if (!db) return;
+  const demoOwner = await db.select({ id: users.id }).from(users).where(eq(users.role, "admin")).limit(1);
+  if (!demoOwner[0]) return;
+  await db.update(products).set({ sellerUserId: demoOwner[0].id }).where(isNull(products.sellerUserId));
+}
+
 function productWhere(input: { query?: string; categorySlug?: string; status?: "active" | "reserved" | "archived" }) {
   const conditions = [];
   if (input.status) conditions.push(eq(products.status, input.status));
@@ -462,6 +470,34 @@ export async function getProduct(productId: number) {
     .limit(1);
   const result = await attachImages(db, rows);
   return result[0];
+}
+
+export async function listPublishedProductsForUser(userId: number) {
+  await ensureDemoCatalog();
+  await ensureDemoListingOwnership();
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({ product: products, category: categories })
+    .from(products)
+    .innerJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.sellerUserId, userId))
+    .orderBy(desc(products.updatedAt));
+  return attachImages(db, rows);
+}
+
+export async function getPersonalCenterForUser(userId: number) {
+  const [ordersForUser, listings] = await Promise.all([listOrdersForUser(userId), listPublishedProductsForUser(userId)]);
+  return {
+    orders: ordersForUser,
+    listings,
+    summary: {
+      orderCount: ordersForUser.length,
+      activeListings: listings.filter(item => item.product.status === "active").length,
+      reservedListings: listings.filter(item => item.product.status === "reserved").length,
+      archivedListings: listings.filter(item => item.product.status === "archived").length,
+    },
+  };
 }
 
 export async function updateProductStatus(input: { productId: number; status: "active" | "reserved" | "archived"; actorUserId: number }) {

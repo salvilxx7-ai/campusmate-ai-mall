@@ -6,6 +6,7 @@ import { adminRouter } from "./routers/admin";
 import { catalogRouter } from "./routers/catalog";
 import { customerServiceRouter } from "./routers/customerService";
 import { ordersRouter } from "./routers/orders";
+import { profileRouter } from "./routers/profile";
 
 export const appRouter = router({
   system: systemRouter,
@@ -20,6 +21,7 @@ export const appRouter = router({
   catalog: catalogRouter,
   customerService: customerServiceRouter,
   orders: ordersRouter,
+  profile: profileRouter,
   admin: adminRouter,
 });
 

@@ -5,6 +5,7 @@ import Admin from "@/pages/Admin";
 import CustomerService from "@/pages/CustomerService";
 import Evaluation from "@/pages/Evaluation";
 import ProjectGuide from "@/pages/ProjectGuide";
+import Profile from "@/pages/Profile";
 import Goods from "@/pages/Goods";
 import Home from "@/pages/Home";
 import OrderDetail from "@/pages/OrderDetail";
@@ -25,6 +26,7 @@ function Router() {
     <Route path="/assistant" component={CustomerService} />
     <Route path="/evaluation" component={Evaluation} />
     <Route path="/project" component={ProjectGuide} />
+    <Route path="/profile" component={Profile} />
     <Route path="/404" component={NotFound} />
     <Route component={NotFound} />
   </Switch>;
