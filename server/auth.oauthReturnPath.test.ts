@@ -3,8 +3,9 @@ import { encodeOAuthState } from "../shared/const";
 import { getSafeOAuthReturnPath } from "./_core/oauth";
 
 describe("OAuth return path", () => {
-  it("accepts only the two explicit in-app post-login destinations", () => {
+  it("accepts only the explicit in-app post-login destinations", () => {
     expect(getSafeOAuthReturnPath(encodeOAuthState({ redirectUri: "https://campusmate.example/api/oauth/callback", nonce: "nonce", returnTo: "/profile" }))).toBe("/profile");
+    expect(getSafeOAuthReturnPath(encodeOAuthState({ redirectUri: "https://campusmate.example/api/oauth/callback", nonce: "nonce", returnTo: "/profile/listings" }))).toBe("/profile/listings");
     expect(getSafeOAuthReturnPath(encodeOAuthState({ redirectUri: "https://campusmate.example/api/oauth/callback", nonce: "nonce", returnTo: "/admin" }))).toBe("/admin");
   });
 

@@ -11,6 +11,11 @@ const publishInput = z.object({
   images: z.array(z.object({ name: z.string().max(100), dataUrl: z.string().max(2_800_000) })).min(1).max(3),
 });
 
+const listingEditInput = publishInput.omit({ images: true }).extend({
+  productId: z.number().int().positive(),
+  images: z.array(z.object({ name: z.string().max(100), dataUrl: z.string().max(2_800_000) })).min(1).max(3).optional(),
+});
+
 export const catalogRouter = router({
   categories: publicProcedure.query(() => db.listCategories()),
   list: publicProcedure
@@ -19,4 +24,7 @@ export const catalogRouter = router({
   featured: publicProcedure.query(() => db.listProducts({ status: "active", limit: 6 })),
   get: publicProcedure.input(z.object({ productId: z.number().int().positive() })).query(({ input }) => db.getProduct(input.productId)),
   publish: protectedProcedure.input(publishInput).mutation(({ ctx, input }) => db.createUserListing({ userId: ctx.user.id, ...input })),
+  updateListing: protectedProcedure.input(listingEditInput).mutation(({ ctx, input }) => db.updateUserListing({ userId: ctx.user.id, ...input })),
+  withdrawListing: protectedProcedure.input(z.object({ productId: z.number().int().positive() })).mutation(({ ctx, input }) => db.withdrawUserListing({ userId: ctx.user.id, ...input })),
+  resubmitListing: protectedProcedure.input(z.object({ productId: z.number().int().positive() })).mutation(({ ctx, input }) => db.resubmitUserListing({ userId: ctx.user.id, ...input })),
 });

@@ -28,6 +28,13 @@ import { resolveOrderRead, resolveOwnerOrderList } from "./security/orderAuditFl
 import { decideOrderAccess } from "./security/orderAccess";
 import { decideUserRoleChange } from "./security/userRolePolicy";
 import { parseUserListingImage, type PublishImage } from "./catalog/userListingPolicy";
+import {
+  decideAdministratorReview,
+  decideOwnerListingEdit,
+  decideOwnerListingResubmission,
+  decideOwnerListingWithdrawal,
+  type ListingStatus,
+} from "./catalog/listingLifecycle";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { getPythonAgentHealth, indexPublicKnowledgeDocument, removePublicKnowledgeDocument } from "./agent/pythonAgentGateway";
 
@@ -575,7 +582,7 @@ async function ensureDemoListingOwnership() {
   await db.update(products).set({ sellerUserId: demoOwner[0].id }).where(isNull(products.sellerUserId));
 }
 
-function productWhere(input: { query?: string; categorySlug?: string; status?: "pending_review" | "active" | "reserved" | "archived" }) {
+function productWhere(input: { query?: string; categorySlug?: string; status?: ListingStatus }) {
   const conditions = [];
   if (input.status) conditions.push(eq(products.status, input.status));
   if (input.categorySlug) conditions.push(eq(categories.slug, input.categorySlug));
@@ -605,7 +612,7 @@ async function attachImages<T extends { product: { id: number; title: string } }
   }));
 }
 
-export async function listProducts(input: { query?: string; categorySlug?: string; status?: "pending_review" | "active" | "reserved" | "archived"; limit?: number }) {
+export async function listProducts(input: { query?: string; categorySlug?: string; status?: ListingStatus; limit?: number }) {
   await ensureDemoCatalog();
   const db = await getDb();
   if (!db) return [];
@@ -683,6 +690,133 @@ export async function createUserListing(input: {
   return getProductForOwner(created.id, input.userId);
 }
 
+type ListingEditInput = {
+  userId: number;
+  productId: number;
+  categoryId: number;
+  title: string;
+  description: string;
+  priceCents: number;
+  condition: "excellent" | "good" | "fair";
+  images?: PublishImage[];
+};
+
+function validateListingFields(input: Pick<ListingEditInput, "title" | "description" | "priceCents">) {
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (title.length < 2 || title.length > 160) throw new Error("商品标题需为 2 至 160 个字符");
+  if (description.length < 10 || description.length > 2000) throw new Error("详细描述需为 10 至 2000 个字符");
+  if (!Number.isInteger(input.priceCents) || input.priceCents < 100 || input.priceCents > 9_999_999) throw new Error("价格应在 1 至 99,999.99 元之间");
+  return { title, description };
+}
+
+export async function updateUserListing(input: ListingEditInput) {
+  await ensureDemoCatalog();
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const result = await db.transaction(async tx => {
+    const existing = (await tx.select({ product: products }).from(products).where(and(eq(products.id, input.productId), eq(products.sellerUserId, input.userId))).limit(1).for("update"))[0];
+    if (!existing) return { kind: "missing" as const };
+    const decision = decideOwnerListingEdit(existing.product.status);
+    if (decision.kind === "deny") {
+      await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.edit", resourceType: "product", resourceId: String(input.productId), outcome: "denied", reason: existing.product.status });
+      return { kind: "deny" as const, message: decision.message };
+    }
+    const [category] = await tx.select({ id: categories.id }).from(categories).where(eq(categories.id, input.categoryId)).limit(1);
+    if (!category) return { kind: "category_missing" as const };
+    const { title, description } = validateListingFields(input);
+    if (input.images && (input.images.length < 1 || input.images.length > 3)) throw new Error("更换图片时请上传 1 至 3 张商品图片");
+    await tx.update(products).set({ categoryId: category.id, title, description, priceCents: input.priceCents, condition: input.condition, status: decision.nextStatus, reviewReason: null }).where(eq(products.id, input.productId));
+    if (input.images) {
+      const storedImages = await Promise.all(input.images.map(async (image, index) => {
+        const parsed = parseUserListingImage(image);
+        const stored = await storagePut(`listings/${input.userId}/${nanoid(10)}-${index + 1}.${parsed.extension}`, parsed.content, parsed.mimeType);
+        return { ...stored, altText: `用户发布闲置物品：${title}`, sortOrder: index + 1 };
+      }));
+      await tx.delete(productImages).where(eq(productImages.productId, input.productId));
+      await Promise.all(storedImages.map(image => tx.insert(productImages).values({ productId: input.productId, storageKey: image.key, url: image.url, altText: image.altText, sortOrder: image.sortOrder })));
+    }
+    await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.edit", resourceType: "product", resourceId: String(input.productId), outcome: "allowed", reason: `${existing.product.status}_to_pending_review` });
+    return { kind: "updated" as const };
+  });
+  if (result.kind === "missing") throw new Error("未找到可管理的商品");
+  if (result.kind === "deny") throw new Error(result.message);
+  if (result.kind === "category_missing") throw new Error("请选择有效商品分类");
+  return getProductForOwner(input.productId, input.userId);
+}
+
+export async function withdrawUserListing(input: { userId: number; productId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const result = await db.transaction(async tx => {
+    const existing = (await tx.select({ id: products.id, status: products.status }).from(products).where(and(eq(products.id, input.productId), eq(products.sellerUserId, input.userId))).limit(1).for("update"))[0];
+    if (!existing) return { kind: "missing" as const };
+    const decision = decideOwnerListingWithdrawal(existing.status);
+    if (decision.kind === "deny") {
+      await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.withdraw", resourceType: "product", resourceId: String(input.productId), outcome: "denied", reason: existing.status });
+      return { kind: "deny" as const, message: decision.message };
+    }
+    if (decision.kind === "allow") await tx.update(products).set({ status: decision.nextStatus }).where(eq(products.id, existing.id));
+    await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.withdraw", resourceType: "product", resourceId: String(input.productId), outcome: "allowed", reason: decision.kind === "noop" ? "already_archived" : `${existing.status}_to_archived` });
+    return { kind: "withdrawn" as const };
+  });
+  if (result.kind === "missing") throw new Error("未找到可管理的商品");
+  if (result.kind === "deny") throw new Error(result.message);
+  return getProductForOwner(input.productId, input.userId);
+}
+
+export async function resubmitUserListing(input: { userId: number; productId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const result = await db.transaction(async tx => {
+    const existing = (await tx.select({ id: products.id, status: products.status }).from(products).where(and(eq(products.id, input.productId), eq(products.sellerUserId, input.userId))).limit(1).for("update"))[0];
+    if (!existing) return { kind: "missing" as const };
+    const decision = decideOwnerListingResubmission(existing.status);
+    if (decision.kind === "deny") {
+      await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.resubmit", resourceType: "product", resourceId: String(input.productId), outcome: "denied", reason: existing.status });
+      return { kind: "deny" as const, message: decision.message };
+    }
+    if (decision.kind === "allow") await tx.update(products).set({ status: decision.nextStatus, reviewReason: null }).where(eq(products.id, existing.id));
+    await tx.insert(auditLogs).values({ actorUserId: input.userId, action: "product.owner.resubmit", resourceType: "product", resourceId: String(input.productId), outcome: "allowed", reason: decision.kind === "noop" ? "already_pending_review" : `${existing.status}_to_pending_review` });
+    return { kind: "resubmitted" as const };
+  });
+  if (result.kind === "missing") throw new Error("未找到可管理的商品");
+  if (result.kind === "deny") throw new Error(result.message);
+  return getProductForOwner(input.productId, input.userId);
+}
+
+export async function batchReviewProducts(input: { actorUserId: number; productIds: number[]; action: "approve" | "reject"; reviewReason?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  assertAuditMutationAllowed("append");
+  const uniqueIds = Array.from(new Set(input.productIds));
+  const reviewReason = input.action === "reject" ? input.reviewReason?.trim() : undefined;
+  if (input.action === "reject" && (!reviewReason || reviewReason.length < 2 || reviewReason.length > 255)) throw new Error("拒绝原因需为 2 至 255 个字符");
+  return db.transaction(async tx => {
+    const rows = await tx.select({ id: products.id, status: products.status }).from(products).where(inArray(products.id, uniqueIds)).for("update");
+    const rowsById = new Map(rows.map(row => [row.id, row]));
+    const results: Array<{ productId: number; outcome: "approved" | "rejected" | "skipped"; message?: string }> = [];
+    for (const productId of uniqueIds) {
+      const product = rowsById.get(productId);
+      if (!product) {
+        await tx.insert(auditLogs).values({ actorUserId: input.actorUserId, action: "product.batch_review", resourceType: "product", resourceId: String(productId), outcome: "denied", reason: "missing" });
+        results.push({ productId, outcome: "skipped", message: "商品不存在" });
+        continue;
+      }
+      const decision = decideAdministratorReview(product.status, input.action);
+      if (decision.kind === "deny") {
+        await tx.insert(auditLogs).values({ actorUserId: input.actorUserId, action: "product.batch_review", resourceType: "product", resourceId: String(productId), outcome: "denied", reason: product.status });
+        results.push({ productId, outcome: "skipped", message: decision.message });
+        continue;
+      }
+      await tx.update(products).set({ status: decision.nextStatus, reviewReason: input.action === "reject" ? reviewReason : null }).where(eq(products.id, product.id));
+      await tx.insert(auditLogs).values({ actorUserId: input.actorUserId, action: "product.batch_review", resourceType: "product", resourceId: String(productId), outcome: "allowed", reason: input.action });
+      results.push({ productId, outcome: input.action === "approve" ? "approved" : "rejected" });
+    }
+    return { results, approvedCount: results.filter(item => item.outcome === "approved").length, rejectedCount: results.filter(item => item.outcome === "rejected").length, skippedCount: results.filter(item => item.outcome === "skipped").length };
+  });
+}
+
 async function getProductForOwner(productId: number, ownerUserId: number) {
   const db = await getDb();
   if (!db) return undefined;
@@ -704,6 +838,7 @@ export async function getPersonalCenterForUser(userId: number) {
       activeListings: listings.filter(item => item.product.status === "active").length,
       reservedListings: listings.filter(item => item.product.status === "reserved").length,
       archivedListings: listings.filter(item => item.product.status === "archived").length,
+      rejectedListings: listings.filter(item => item.product.status === "rejected").length,
     },
   };
 }
@@ -803,7 +938,7 @@ export async function updateUserRoleByAdmin(input: { actorUserId: number; target
   return { changed: outcome.kind === "changed", user: (await listUsersForAdmin()).find(user => user.id === outcome.targetUserId) };
 }
 
-export async function updateProductStatus(input: { productId: number; status: "pending_review" | "active" | "reserved" | "archived"; actorUserId: number }) {
+export async function updateProductStatus(input: { productId: number; status: ListingStatus; actorUserId: number }) {
   const db = await getDb();
   if (!db) throw new Error("数据库暂不可用");
   const existing = await getProduct(input.productId, true);

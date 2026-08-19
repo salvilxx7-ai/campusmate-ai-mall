@@ -10,9 +10,9 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-export function getSafeOAuthReturnPath(state: string): "/" | "/profile" | "/admin" {
+export function getSafeOAuthReturnPath(state: string): "/" | "/profile" | "/profile/listings" | "/admin" {
   const returnTo = decodeOAuthState(state).returnTo;
-  return returnTo === "/profile" || returnTo === "/admin" ? returnTo : "/";
+  return returnTo === "/profile" || returnTo === "/profile/listings" || returnTo === "/admin" ? returnTo : "/";
 }
 
 export function registerOAuthRoutes(app: Express) {

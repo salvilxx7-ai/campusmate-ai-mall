@@ -4,7 +4,7 @@ import { adminProcedure, router } from "../_core/trpc";
 import { runFixedRetrievalQualityEvaluation } from "../evaluation/retrievalQuality";
 
 export const adminRouter = router({
-  products: adminProcedure.query(() => db.listProducts({})),
+  products: adminProcedure.input(z.object({ status: z.enum(["pending_review", "active", "reserved", "archived", "rejected"]).optional() }).optional()).query(({ input }) => db.listProducts({ status: input?.status })),
   users: adminProcedure.query(() => db.listUsersForAdmin()),
   supportTickets: adminProcedure.query(() => db.listSupportTicketsForAdmin()),
   updateSupportTicketStatus: adminProcedure
@@ -39,6 +39,11 @@ export const adminRouter = router({
   updateProductStatus: adminProcedure
     .input(z.object({ productId: z.number().int().positive(), status: z.enum(["pending_review", "active", "reserved", "archived"]) }))
     .mutation(({ ctx, input }) => db.updateProductStatus({ ...input, actorUserId: ctx.user.id })),
+  batchReviewProducts: adminProcedure
+    .input(z.object({ productIds: z.array(z.number().int().positive()).min(1).max(30), action: z.enum(["approve", "reject"]), reviewReason: z.string().trim().min(2).max(255).optional() }).superRefine((input, context) => {
+      if (input.action === "reject" && !input.reviewReason) context.addIssue({ code: z.ZodIssueCode.custom, message: "批量拒绝必须填写原因", path: ["reviewReason"] });
+    }))
+    .mutation(({ ctx, input }) => db.batchReviewProducts({ ...input, actorUserId: ctx.user.id })),
   seedDemoCatalog: adminProcedure.mutation(async ({ ctx }) => {
     const result = await db.seedDemoCatalog();
     await db.writeAuditLog({

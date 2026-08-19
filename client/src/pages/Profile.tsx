@@ -13,8 +13,8 @@ import { useEffect, useState } from "react";
 import { Link } from "wouter";
 
 const orderStatus = { placed: "已创建", confirmed: "待交接", completed: "已完成", cancelled: "已取消" } as const;
-const listingStatus = { pending_review: "等待审核", active: "展示中", reserved: "已被预留", archived: "已下架" } as const;
-const listingTone = { pending_review: "bg-violet-50 text-violet-700", active: "bg-emerald-50 text-emerald-700", reserved: "bg-amber-50 text-amber-700", archived: "bg-muted text-muted-foreground" } as const;
+const listingStatus = { pending_review: "等待审核", active: "展示中", reserved: "已被预留", archived: "已下架", rejected: "已拒绝" } as const;
+const listingTone = { pending_review: "bg-violet-50 text-violet-700", active: "bg-emerald-50 text-emerald-700", reserved: "bg-amber-50 text-amber-700", archived: "bg-muted text-muted-foreground", rejected: "bg-red-50 text-red-700" } as const;
 const ticketStatus = { open: "已提交", in_review: "处理中", resolved: "已解决" } as const;
 const ticketTone = { open: "bg-violet-50 text-violet-700", in_review: "bg-amber-50 text-amber-700", resolved: "bg-emerald-50 text-emerald-700" } as const;
 

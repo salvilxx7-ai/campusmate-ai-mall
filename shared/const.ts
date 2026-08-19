@@ -12,7 +12,7 @@ export const OAUTH_STATE_COOKIE = "__Host-oauth_state";
 
 // `state` carries the callback redirect URI (used at token exchange) plus the
 // CSRF nonce. Defined here so the client encoder and server decoder never drift.
-export type OAuthReturnPath = "/" | "/profile" | "/admin";
+export type OAuthReturnPath = "/" | "/profile" | "/profile/listings" | "/admin";
 
 export type OAuthState = { redirectUri: string; nonce?: string; returnTo?: OAuthReturnPath };
 

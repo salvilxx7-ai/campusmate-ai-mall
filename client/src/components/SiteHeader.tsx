@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { BarChart3, BookOpen, Bot, FileText, LayoutDashboard, LogOut, Menu, PackageCheck, Search, ShieldCheck, UserRound } from "lucide-react";
+import { BarChart3, BookOpen, Bot, FileText, LayoutDashboard, LogOut, Menu, PackageCheck, Search, ShieldCheck, Tag, UserRound } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/orders", label: "我的订单", icon: PackageCheck },
   { href: "/assistant", label: "AI 客服", icon: Bot },
   { href: "/profile", label: "个人中心", icon: UserRound },
+  { href: "/profile/listings", label: "发布管理", icon: Tag },
   { href: "/project", label: "项目说明", icon: FileText },
 ];
 

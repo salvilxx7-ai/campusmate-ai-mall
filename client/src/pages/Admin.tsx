@@ -3,6 +3,7 @@ import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AdminReviewPanel } from "@/components/AdminReviewPanel";
 import { trpc } from "@/lib/trpc";
 import { Archive, BookOpen, Database, LockKeyhole, Package, RefreshCw, ShieldCheck, TicketCheck, Upload, UsersRound } from "lucide-react";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { formatPrice, type CatalogProduct } from "@/components/ProductCard";
 import { useRef, useState } from "react";
 import { Link } from "wouter";
 
-const statusLabel = { pending_review: "待审核", active: "已上架", reserved: "已保留", archived: "已下架" };
+const statusLabel = { pending_review: "待审核", active: "已上架", reserved: "已保留", archived: "已下架", rejected: "已拒绝" };
 
 function AdminContent() {
   const utils = trpc.useUtils();
@@ -135,7 +136,7 @@ function AdminContent() {
     updateUserRole.mutate({ userId: targetUserId, role: nextRole });
   };
 
-  return <div className="mx-auto max-w-6xl space-y-7 pb-10">
+  return <div className="mx-auto max-w-6xl space-y-7 pb-10"><AdminReviewPanel />
     <section className="overflow-hidden rounded-[1.75rem] bg-primary p-7 text-primary-foreground shadow-[0_22px_54px_-32px_rgba(45,33,60,0.85)] sm:p-9">
       <p className="text-xs font-semibold tracking-[0.15em] text-[#d8c8e7]">ADMINISTRATOR ONLY</p>
       <h1 className="mt-3 font-display text-4xl font-bold tracking-[-0.055em]">CampusMate 管理台</h1>

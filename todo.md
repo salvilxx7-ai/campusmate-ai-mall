@@ -108,3 +108,7 @@
 - [x] Implement authenticated users' image-backed idle-item publishing form with title, category, price, condition, detailed description, controlled storage upload, and pending-review status.
 - [x] Extend the personal center with a self-only ticket-progress module that maps open, in-review, and resolved states to user-readable progress.
 - [x] Add publishing ownership, upload validation, pending-status, and ticket-visibility regression tests; update baseline and engineering-interview materials.
+- [x] Audit current product lifecycle states, owner-only mutation boundaries, image metadata rules, and administrator approval controls before extending listing management.
+- [x] Implement current-user-only editing, withdrawal, and resubmission of owned listings with explicit permitted status transitions and append-only audit evidence.
+- [x] Add administrator review-list status filtering plus atomic bulk approval or rejection with per-item outcome reporting and protected role gates.
+- [x] Add listing ownership, lifecycle transition, bulk-review authorization and partial-failure tests; update baseline and engineering/interview materials.

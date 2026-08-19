@@ -6,6 +6,7 @@ import CustomerService from "@/pages/CustomerService";
 import Evaluation from "@/pages/Evaluation";
 import ProjectGuide from "@/pages/ProjectGuide";
 import Profile from "@/pages/Profile";
+import ListingManager from "@/pages/ListingManager";
 import PublishItem from "@/pages/PublishItem";
 import Goods from "@/pages/Goods";
 import Home from "./pages/Home";
@@ -29,6 +30,7 @@ function Router() {
     <Route path="/evaluation" component={Evaluation} />
     <Route path="/project" component={ProjectGuide} />
     <Route path="/profile" component={Profile} />
+    <Route path="/profile/listings" component={ListingManager} />
     <Route path="/publish" component={PublishItem} />
     <Route path="/login" component={Login} />
     <Route path="/404" component={NotFound} />
