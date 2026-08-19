@@ -14,6 +14,7 @@ describe("personal-center current-user scoping", () => {
     const center = await getPersonalCenterForUser(actor.id);
     expect(center.listings.length).toBeGreaterThan(0);
     expect(center.listings.every(item => item.product.sellerUserId === actor.id)).toBe(true);
+    expect(center.tickets.every(ticket => ticket.userId === actor.id)).toBe(true);
 
     const unrelatedListings = await listPublishedProductsForUser(actor.id + 999999);
     expect(unrelatedListings).toEqual([]);

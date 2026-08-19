@@ -52,7 +52,7 @@ export const products = mysqlTable(
     description: text("description").notNull(),
     priceCents: int("priceCents").notNull(),
     condition: mysqlEnum("condition", ["excellent", "good", "fair"]).notNull(),
-    status: mysqlEnum("status", ["active", "reserved", "archived"]).default("active").notNull(),
+    status: mysqlEnum("status", ["pending_review", "active", "reserved", "archived"]).default("active").notNull(),
     sellerUserId: int("sellerUserId").references(() => users.id),
     sellerLabel: varchar("sellerLabel", { length: 80 }).notNull(),
     isDemo: int("isDemo").default(1).notNull(),

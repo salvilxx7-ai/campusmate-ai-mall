@@ -8,7 +8,7 @@ export type CatalogProduct = {
     priceCents: number;
     condition: "excellent" | "good" | "fair";
     sellerLabel: string;
-    status: "active" | "reserved" | "archived";
+    status: "pending_review" | "active" | "reserved" | "archived";
     description: string;
   };
   category: { name: string; slug: string };

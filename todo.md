@@ -104,3 +104,7 @@
 - [x] Add reproducible measurements for native Function Calling selection and the administrator ticket queue, including success, fallback, authorization, and latency fields.
 - [x] Add a front-end delivery evidence record that inventories shipped routes and explicitly preserves the absence of a 2-second loading claim until real Web Vitals are captured.
 - [x] Add a structured native-tool measurement record for catalog success, unauthenticated own-order/ticket rejection, fallback behavior, and per-case latency fields.
+- [x] Audit the existing product schema, object-storage integration, current-user profile queries, and ticket-status boundaries before adding a user publishing flow.
+- [x] Implement authenticated users' image-backed idle-item publishing form with title, category, price, condition, detailed description, controlled storage upload, and pending-review status.
+- [x] Extend the personal center with a self-only ticket-progress module that maps open, in-review, and resolved states to user-readable progress.
+- [x] Add publishing ownership, upload validation, pending-status, and ticket-visibility regression tests; update baseline and engineering-interview materials.

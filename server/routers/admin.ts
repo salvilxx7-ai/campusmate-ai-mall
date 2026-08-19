@@ -37,7 +37,7 @@ export const adminRouter = router({
     .input(z.object({ documentId: z.number().int().positive(), reason: z.string().trim().min(4).max(255) }))
     .mutation(({ ctx, input }) => db.retireKnowledgeDocument({ ...input, actorUserId: ctx.user.id })),
   updateProductStatus: adminProcedure
-    .input(z.object({ productId: z.number().int().positive(), status: z.enum(["active", "reserved", "archived"]) }))
+    .input(z.object({ productId: z.number().int().positive(), status: z.enum(["pending_review", "active", "reserved", "archived"]) }))
     .mutation(({ ctx, input }) => db.updateProductStatus({ ...input, actorUserId: ctx.user.id })),
   seedDemoCatalog: adminProcedure.mutation(async ({ ctx }) => {
     const result = await db.seedDemoCatalog();

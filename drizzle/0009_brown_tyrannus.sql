@@ -1,0 +1,1 @@
+ALTER TABLE `products` MODIFY COLUMN `status` enum('pending_review','active','reserved','archived') NOT NULL DEFAULT 'active';

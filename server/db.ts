@@ -27,6 +27,7 @@ import { buildOrderReadAuditEvent } from "./security/orderAudit";
 import { resolveOrderRead, resolveOwnerOrderList } from "./security/orderAuditFlow";
 import { decideOrderAccess } from "./security/orderAccess";
 import { decideUserRoleChange } from "./security/userRolePolicy";
+import { parseUserListingImage, type PublishImage } from "./catalog/userListingPolicy";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { getPythonAgentHealth, indexPublicKnowledgeDocument, removePublicKnowledgeDocument } from "./agent/pythonAgentGateway";
 
@@ -574,7 +575,7 @@ async function ensureDemoListingOwnership() {
   await db.update(products).set({ sellerUserId: demoOwner[0].id }).where(isNull(products.sellerUserId));
 }
 
-function productWhere(input: { query?: string; categorySlug?: string; status?: "active" | "reserved" | "archived" }) {
+function productWhere(input: { query?: string; categorySlug?: string; status?: "pending_review" | "active" | "reserved" | "archived" }) {
   const conditions = [];
   if (input.status) conditions.push(eq(products.status, input.status));
   if (input.categorySlug) conditions.push(eq(categories.slug, input.categorySlug));
@@ -604,7 +605,7 @@ async function attachImages<T extends { product: { id: number; title: string } }
   }));
 }
 
-export async function listProducts(input: { query?: string; categorySlug?: string; status?: "active" | "reserved" | "archived"; limit?: number }) {
+export async function listProducts(input: { query?: string; categorySlug?: string; status?: "pending_review" | "active" | "reserved" | "archived"; limit?: number }) {
   await ensureDemoCatalog();
   const db = await getDb();
   if (!db) return [];
@@ -618,7 +619,7 @@ export async function listProducts(input: { query?: string; categorySlug?: strin
   return attachImages(db, rows);
 }
 
-export async function getProduct(productId: number) {
+export async function getProduct(productId: number, includeNonPublic = false) {
   await ensureDemoCatalog();
   const db = await getDb();
   if (!db) return undefined;
@@ -626,7 +627,7 @@ export async function getProduct(productId: number) {
     .select({ product: products, category: categories })
     .from(products)
     .innerJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.id, productId))
+    .where(includeNonPublic ? eq(products.id, productId) : and(eq(products.id, productId), eq(products.status, "active")))
     .limit(1);
   const result = await attachImages(db, rows);
   return result[0];
@@ -646,13 +647,60 @@ export async function listPublishedProductsForUser(userId: number) {
   return attachImages(db, rows);
 }
 
+export async function createUserListing(input: {
+  userId: number;
+  categoryId: number;
+  title: string;
+  description: string;
+  priceCents: number;
+  condition: "excellent" | "good" | "fair";
+  images: PublishImage[];
+}) {
+  await ensureDemoCatalog();
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  if (input.images.length < 1 || input.images.length > 3) throw new Error("请上传 1 至 3 张商品图片");
+  const [category] = await db.select().from(categories).where(eq(categories.id, input.categoryId)).limit(1);
+  if (!category) throw new Error("请选择有效商品分类");
+  const [seller] = await db.select({ name: users.name, profileName: users.profileName }).from(users).where(eq(users.id, input.userId)).limit(1);
+  if (!seller) throw new Error("未找到当前用户");
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (title.length < 2 || title.length > 160) throw new Error("商品标题需为 2 至 160 个字符");
+  if (description.length < 10 || description.length > 2000) throw new Error("详细描述需为 10 至 2000 个字符");
+  if (!Number.isInteger(input.priceCents) || input.priceCents < 100 || input.priceCents > 9_999_999) throw new Error("价格应在 1 至 99,999.99 元之间");
+  const storedImages = await Promise.all(input.images.map(async (image, index) => {
+    const parsed = parseUserListingImage(image);
+    const stored = await storagePut(`listings/${input.userId}/${nanoid(10)}-${index + 1}.${parsed.extension}`, parsed.content, parsed.mimeType);
+    return { ...stored, altText: `用户发布闲置物品：${title}` };
+  }));
+  const sellerLabel = `校园用户 · ${(seller.profileName || seller.name || "匿名同学").slice(0, 48)}`;
+  await db.insert(products).values({ categoryId: category.id, title, description, priceCents: input.priceCents, condition: input.condition, status: "pending_review", sellerUserId: input.userId, sellerLabel, isDemo: 1 });
+  const [created] = await db.select().from(products).where(and(eq(products.sellerUserId, input.userId), eq(products.title, title))).orderBy(desc(products.id)).limit(1);
+  if (!created) throw new Error("商品发布记录创建失败");
+  await Promise.all(storedImages.map((image, index) => db.insert(productImages).values({ productId: created.id, storageKey: image.key, url: image.url, altText: image.altText, sortOrder: index + 1 })));
+  await writeAuditLog({ actorUserId: input.userId, action: "product.publish", resourceType: "product", resourceId: String(created.id), outcome: "allowed", reason: "pending_review" });
+  return getProductForOwner(created.id, input.userId);
+}
+
+async function getProductForOwner(productId: number, ownerUserId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db.select({ product: products, category: categories }).from(products).innerJoin(categories, eq(products.categoryId, categories.id)).where(and(eq(products.id, productId), eq(products.sellerUserId, ownerUserId))).limit(1);
+  return (await attachImages(db, rows))[0];
+}
+
 export async function getPersonalCenterForUser(userId: number) {
-  const [ordersForUser, listings] = await Promise.all([listOrdersForUser(userId), listPublishedProductsForUser(userId)]);
+  const [ordersForUser, listings, tickets] = await Promise.all([listOrdersForUser(userId), listPublishedProductsForUser(userId), listSupportTicketsForUser(userId)]);
   return {
     orders: ordersForUser,
     listings,
+    tickets,
     summary: {
       orderCount: ordersForUser.length,
+      ticketCount: tickets.length,
+      openTickets: tickets.filter(ticket => ticket.status === "open" || ticket.status === "in_review").length,
+      pendingListings: listings.filter(item => item.product.status === "pending_review").length,
       activeListings: listings.filter(item => item.product.status === "active").length,
       reservedListings: listings.filter(item => item.product.status === "reserved").length,
       archivedListings: listings.filter(item => item.product.status === "archived").length,
@@ -755,10 +803,10 @@ export async function updateUserRoleByAdmin(input: { actorUserId: number; target
   return { changed: outcome.kind === "changed", user: (await listUsersForAdmin()).find(user => user.id === outcome.targetUserId) };
 }
 
-export async function updateProductStatus(input: { productId: number; status: "active" | "reserved" | "archived"; actorUserId: number }) {
+export async function updateProductStatus(input: { productId: number; status: "pending_review" | "active" | "reserved" | "archived"; actorUserId: number }) {
   const db = await getDb();
   if (!db) throw new Error("数据库暂不可用");
-  const existing = await getProduct(input.productId);
+  const existing = await getProduct(input.productId, true);
   if (!existing) throw new Error("未找到该商品");
   await db.update(products).set({ status: input.status }).where(eq(products.id, input.productId));
   await writeAuditLog({
