@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
-import { ArrowRight, Check, Search, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, Bot, Check, Search, ShieldCheck, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 
@@ -38,7 +38,7 @@ export default function Home() {
                 <span className="block text-primary">在校园里继续发光。</span>
               </h1>
               <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
-                从一盏阅读灯到一套复习资料，CampusMate 让每件仍有价值的物品被认真看见。浏览无需登录，下单与订单服务始终由安全边界保护。
+                从一盏阅读灯到一套复习资料，CampusMate 让每件仍有价值的物品被认真看见。浏览无需登录，下单与订单服务始终由安全边界保护；不确定规则、商品或订单时，可以直接问 AI 客服。
               </p>
               <form className="mt-8 flex max-w-xl gap-2 rounded-2xl border border-border bg-card p-2 shadow-[0_14px_38px_-25px_rgba(45,33,60,0.35)]" onSubmit={submitSearch}>
                 <Search className="ml-2 mt-2.5 size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -51,6 +51,10 @@ export default function Home() {
                 />
                 <Button type="submit" className="rounded-xl px-4 sm:px-5">开始发现</Button>
               </form>
+              <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+                <Link href="/assistant" className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 font-semibold text-primary-foreground transition-transform duration-200 hover:scale-[1.02] active:scale-[0.97]"><Bot className="size-4" />问 AI 智能客服</Link>
+                <span className="text-xs leading-5 text-muted-foreground">可问规则、找商品、查“我的模拟订单”</span>
+              </div>
             </div>
 
             <aside className="relative mx-auto w-full max-w-md rounded-[2rem] border border-primary/15 bg-primary p-6 text-primary-foreground shadow-[0_30px_70px_-35px_rgba(45,33,60,0.85)] sm:p-8">

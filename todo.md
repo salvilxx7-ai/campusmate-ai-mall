@@ -43,3 +43,7 @@
 - [x] Verify unauthenticated access to `/profile` and capture the login-gated state as validation evidence.
 - [x] Add a route-level test proving `profile.mine` rejects requests without an authenticated session.
 - [x] Document the personal-center walkthrough from browsing through simulated ordering to the reflected order and listing states.
+- [x] Reconcile the original portfolio goals against the implemented CampusMate modules and identify any remaining presentation gaps.
+- [x] Diagnose the AI customer-service route, header entry, authentication behavior, and conversation flow to explain its current visibility.
+- [x] Improve the discoverability and first-use guidance of the AI customer-service experience where needed.
+- [x] Verify the AI customer-service experience on desktop and mobile, update tests or documentation as appropriate, and save an auditable checkpoint.

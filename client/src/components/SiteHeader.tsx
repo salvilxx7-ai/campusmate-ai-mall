@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { startLogin } from "@/const";
 import { Button } from "@/components/ui/button";
-import { BarChart3, BookOpen, Bot, FileText, LayoutDashboard, LogOut, PackageCheck, Search, ShieldCheck, UserRound } from "lucide-react";
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { BarChart3, BookOpen, Bot, FileText, LayoutDashboard, LogOut, Menu, PackageCheck, Search, ShieldCheck, UserRound } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 const navItems = [
@@ -53,6 +54,30 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button size="icon" variant="outline" className="size-9 rounded-full md:hidden" aria-label="打开导航菜单">
+                <Menu className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-[min(86vw,22rem)] p-0">
+              <SheetHeader className="border-b border-border p-6 pr-12">
+                <SheetTitle className="font-display text-2xl">CampusMate</SheetTitle>
+                <SheetDescription>商城、模拟订单与有据可查的 AI 客服。</SheetDescription>
+              </SheetHeader>
+              <nav className="flex flex-col gap-1 p-4" aria-label="移动端主导航">
+                {navItems.map(item => {
+                  const Icon = item.icon;
+                  const active = item.href === "/" ? location === "/" : location.startsWith(item.href);
+                  return <SheetClose key={item.href} asChild><Link href={item.href} className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors ${active ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}><Icon className="size-4" />{item.label}</Link></SheetClose>;
+                })}
+                {user?.role === "admin" ? <><SheetClose asChild><Link href="/admin" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><LayoutDashboard className="size-4" />管理台</Link></SheetClose><SheetClose asChild><Link href="/evaluation" className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:bg-secondary/70 hover:text-foreground"><BarChart3 className="size-4" />评测</Link></SheetClose></> : null}
+              </nav>
+              <SheetFooter className="border-t border-border p-4">
+                {!isAuthenticated ? <Button className="w-full rounded-xl" onClick={() => startLogin()}>登录后下单</Button> : <p className="px-2 text-sm text-muted-foreground">当前登录：{user?.name ?? "校园用户"}</p>}
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
           {loading ? <span className="h-9 w-20 animate-pulse rounded-full bg-secondary" /> : null}
           {!loading && !isAuthenticated ? (
             <Button size="sm" onClick={() => startLogin()} className="rounded-full px-4">
