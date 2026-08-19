@@ -66,3 +66,12 @@ pnpm check
 ## 测试覆盖
 
 当前 35 项测试覆盖 OAuth 登出、管理员过程拒绝、订单所有权、审计追加策略、客服显式工作流、模拟工单认证与归属、TF-IDF 稀有词排序和六案例评测指标聚合。运行 `pnpm test` 可验证完整测试集。
+
+## 项目理解与面试复盘
+
+本仓库将“能运行”与“能讲清楚”视为同等重要的交付要求。每次功能变更都会回顾并更新以下长期文档：
+
+- [`docs/project-baseline.md`](./docs/project-baseline.md)：项目目标、业务验收、真实技术边界、非功能要求与每轮开发的强制复盘流程。
+- [`docs/engineering-and-interview-log.md`](./docs/engineering-and-interview-log.md)：逐模块业务流程、数据流、失败处理、工程取舍与面试深挖问答。
+- [`docs/ai-agent-capability-audit.md`](./docs/ai-agent-capability-audit.md)：用户目标陈述与当前实现的真实性核对。
+- [`docs/resume-ready-campusmate.md`](./docs/resume-ready-campusmate.md)：只使用已验证能力的简历项目表述，以及后续技术补齐路线。

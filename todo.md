@@ -56,3 +56,6 @@
 - [x] Record reproducible client performance evidence and update project documentation with only measured, supportable results.
 - [x] Add a dedicated resume-ready CampusMate project description that uses only verified technologies and measurable capabilities.
 - [x] Revalidate the persisted performance evidence and all documentation updates with the full test, type-check, and production-build workflow.
+- [x] Create a durable Markdown baseline defining CampusMate goals, demonstrable boundaries, acceptance criteria, and non-negotiable truthfulness rules.
+- [x] Create a feature-by-feature engineering log covering business process, implementation route, expected failures, response playbooks, and interview deep-dive prompts.
+- [x] Establish and document the rule that every subsequent feature change updates both baseline requirements and the engineering/interview log before checkpointing.
