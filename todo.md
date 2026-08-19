@@ -129,4 +129,4 @@
 - [x] Audit README and all tracked documentation for interview, résumé, portfolio, defense, review, or job-search wording and identify personal-preparation files that must leave the repository.
 - [x] Remove job-search-oriented copy, links, filenames, and documentation-index entries from the GitHub delivery repository while retaining product, requirements, technical, and operations documentation.
 - [x] Move the single personal preparation reference into an ignored private workspace document and add explicit ignore rules for that material.
-- [ ] Verify tracked-file wording is product-only, confirm personal preparation material is ignored, save the correction, and push the GitHub fix commit.
+- [x] Verify tracked-file wording is product-only, confirm personal preparation material is ignored, save the correction, and push the GitHub fix commit.
