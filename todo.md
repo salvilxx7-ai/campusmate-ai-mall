@@ -1,0 +1,38 @@
+# Project TODO
+
+- [x] Define the CampusMate product scope, experience principles, route map, and presentation-ready business flow.
+- [x] Select, license-check, and clone an open-source campus marketplace reference or foundation before adapting its permitted patterns into CampusMate.
+- [x] Document the reference marketplace's client/server/data build flow, dependency boundaries, runnable paths, and known technical risks before reusing any permitted pattern.
+- [x] Explain each CampusMate design decision through the contrast between the reference implementation and the new secure AI-enabled implementation.
+- [x] Find, source-check, and safely apply a verified GitHub UI/UX design skill or equivalent guidance to the CampusMate visual system.
+- [x] Apply the confirmed academy-editorial visual system and discovery-first homepage narrative across the CampusMate customer experience.
+- [x] Strengthen the academy-editorial visual system on the goods, order, detail, and empty/auth states to match the homepage, then re-review with screenshots.
+- [x] Verify the refined storefront on desktop and mobile, including product list, detail, orders, and empty/auth states.
+- [x] Capture mobile verification for product detail, orders, and unauthenticated/empty states.
+- [x] Create database schema for categories, products, demo orders, order items, knowledge documents, knowledge chunks, audit logs, and evaluation cases.
+- [x] Complete the user-approved non-destructive migration repair by adding the missing constraints and indexes to verified-empty business tables, then register the corrected migration hash.
+- [x] Implement the confirmed first milestone: database migration, server-side order authorization/audit procedures, clearly labeled demo catalog data, and the product-to-personal-order user flow.
+- [x] Implement public product catalog with keyword search, category filters, responsive product cards, and product detail views.
+- [x] Implement Manus OAuth-aware navigation and role-aware UI that hides all admin entry points from ordinary users.
+- [x] Implement simulated checkout, personal order list, and order detail retrieval scoped strictly to the authenticated user.
+- [x] Implement server-side ownership verification for every order query and record denied cross-user attempts in immutable audit logs.
+- [x] Add append-only audit-log policy and tests proving the application exposes no update or delete path for audit entries.
+- [x] Consistently audit order-detail and order-list requests, with tests that prove denied cross-user reads create a denial record.
+- [x] Add behavior-level tests for allowed and denied order read/list paths that assert append-only audit writes.
+- [x] Implement administrator-only product listing, publish/unpublish controls, and management views.
+- [x] Implement administrator-only knowledge-document upload metadata flow and document processing status UI.
+- [x] Research and source-check public second-hand marketplace and campus-exchange rules/FAQ, preserving source URLs and using only accurately attributed, paraphrased demonstration knowledge.
+- [x] Add a visible knowledge-base provenance disclosure explaining that CampusMate rules are a public-source-informed demo set, not an official university policy.
+- [x] Create the confirmed demonstration knowledge documents for listing rules, simulated-order after-sales guidance, and safe-trading FAQ with source provenance metadata.
+- [x] Implement deterministic document chunking and TF-IDF/cosine retrieval that records its evidence scores for each grounded answer.
+- [x] Implement corpus-level TF-IDF weighting and tests proving rare-term IDF changes retrieval ranking beyond normalized term-frequency overlap.
+- [x] Implement a grounded RAG knowledge-answer flow that returns source citations and refuses to answer when retrieval confidence is insufficient.
+- [x] Implement AI customer-service intent routing for policy questions, product search, personal order queries, and human-support escalation.
+- [x] Implement consent-safe AI tool boundaries so personal order data is returned only to the authenticated account owner.
+- [x] Implement a reproducible evaluation dashboard using fixed, transparently labeled evaluation cases and computed accuracy, citation completeness, refusal correctness, and latency metrics.
+- [x] Implement in-app requirements, architecture, module explanation, and interview deep-dive Q&A pages.
+- [x] Add unit tests for order authorization, audit logging, citation/fallback behavior, intent routing, and admin role gates.
+- [x] Add customer-service behavior tests for evidence citations and low-confidence human handoff.
+- [x] Verify desktop and mobile UI, product and order flows, security denial path, RAG citation/fallback path, and evaluation panel.
+- [x] Run fixed evaluation end-to-end and verify the panel reflects recorded results.
+- [x] Prepare GitHub publication guide, three-to-five-minute recording script, demo dataset disclosure, README, and interview defense guide.
