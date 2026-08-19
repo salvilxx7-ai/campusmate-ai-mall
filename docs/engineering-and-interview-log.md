@@ -18,7 +18,7 @@
 | 公开规则客服 | AI 客服政策问题。 | Node 只发送问题文本至 FastAPI；LangGraph → Chroma/BGE 返回公开引用，Node 生成受控回答。 | 无证据转人工；sidecar/BGE 不可用时 TF-IDF 回退，不能泄露身份或订单。 |
 | 商品/订单客服工具 | 问商品或“我的订单”。 | Node 执行商品公开检索，或经 OAuth 后执行本人订单工具。 | Python 没有数据库和 Cookie；未登录订单查询返回登录提示。 |
 | 模拟人工转接 | 用户主动转人工或无匹配。 | 受保护路由写入 `supportTickets`、工作流轨迹和审计。 | 仅本人读取，不联系真实客服；问“为何保存轨迹”时解释交接、审计和复现价值。 |
-| 管理规则与增量索引 | 管理员上传 `.md/.txt`、HTTPS 来源、同步状态与重试。 | 对象存储/MySQL 是事实源；Node 写分块、指纹和状态，Python Chroma 按指纹 upsert 公开规则。 | 索引失败显示 `failed` 并可重试；问“为何分状态”时区分“已上传”和“客服已可检索”。 |
+| 管理规则与索引运维 | 管理员上传 `.md/.txt`、HTTPS 来源、同步状态、版本替换、失效与批量重建。 | 对象存储/MySQL 是事实源；Node 写分块、指纹和生命周期，Python Chroma 按指纹 upsert/delete 公开规则。 | 索引失败显示 `failed` 并可重试；新版本先同步、旧版本后失效；问“为何分状态”时区分“已上传”“已同步”和“当前可引用”。 |
 | 固定评测与复盘 | 管理员运行六类案例、查看项目说明。 | `evaluationRuns` 保存实际意图、引用、拒答和延迟。 | 指标不是 SLA；问“如何防回归”时说明固定输入、预期结果、自动化测试和审计证据。 |
 
 ```text
@@ -205,8 +205,26 @@
 | 实际流程 | 管理员必须提供 `.md/.txt`、规则类别和 HTTPS 公开来源；Node 存储原文、分块和 SHA-256 指纹后，仅将公开正文/来源元数据发送给 localhost FastAPI；Python 用 BGE 编码并以 `documentId + fingerprint + chunkIndex` 进行 Chroma upsert。 |
 | 状态与审计 | 文档和向量状态分离：`processingStatus` 说明原文是否已分块，`vectorIndexStatus` 记录 `pending → syncing → synced/failed`。成功写入索引版本和时间；失败保留错误摘要并追加审计，管理员可重试。 |
 | 安全边界 | 普通用户被 `adminProcedure` 拒绝；Python 不接收 Cookie、用户 ID、订单/工单、数据库凭据或 LLM 密钥；非 HTTPS 来源在 Node 和 Python 两层拒绝。 |
-| 当前限制 | Chroma 仍是容器本地派生索引。当前新增文档能在同一 sidecar 中即时生效，容器重建后的自动全量 bootstrap 尚未实现。 |
+| 当前限制 | Chroma 仍是容器本地派生索引。当前新增文档能在同一 sidecar 中即时生效；新的 Python 运行实例会在首次公开规则请求前，由 Node bootstrap 当前 `active + ready + synced` 文档。该恢复不是跨容器持久化，且当前不使用常驻队列。 |
 | API 级验证 | 集成测试通过真实 `adminRouter.uploadKnowledgeDocument` 先验证 Python 不可用时的 `failed` 状态，再调用真实 `retryKnowledgeVectorSync` 获得 `synced` 版本，并由 Node 客服返回新规则引用；测试末尾清理临时文档。 |
 
 > **面试追问：为什么要把“文档已上传”和“向量已同步”分开？**  
 > 前者表示事实记录安全落在对象存储/MySQL，后者才表示派生索引可被客服检索。分开状态可以避免索引失败时前端显示“规则已生效”，也让重试、审计和后续重建有明确的责任边界。
+
+## 12. 已实现：规则生命周期与轻量索引运维
+
+| 维度 | 实际结果、问题与应对 |
+|---|---|
+| 业务目的 | 增量同步只能解决“新规则进入当前 Chroma”的问题，不能回答“旧规则何时停止被引用”“sidecar 重启后如何恢复”或“管理员如何一次性检查并修复全部有效规则”。因此将规则版本、生命周期与派生索引恢复纳入同一条管理链路。 |
+| 生命周期与替换顺序 | `knowledgeDocuments` 保存 `active`、`superseded`、`retired` 生命周期、版本号、替代关系和失效原因。替换时先创建并同步新版本；只有新版本 `synced` 后才将旧版本标记为 `superseded` 并从 Chroma 删除，避免新版本失败时提前丢失仍可用的旧规则。 |
+| 运行时 bootstrap | Python `/health` 返回 `runtimeInstanceId`。Node 在首次公开规则请求前识别新的运行实例，查询 MySQL 中 `active + ready + synced` 的管理员规则，并逐份调用 localhost upsert；bootstrap 只恢复当前 Chroma 派生索引，不会改写事实记录或生命周期。 |
+| 失效与批量重建 | 管理员失效规则时，Node 先保留原文与操作原因，再请求 Python 按 `documentId` 删除 Chroma 分块，并写入 `knowledge.retire` 审计；管理员批量重建在同一请求内逐份同步，返回 `total/succeeded/failed`，不引入常驻异步队列。 |
+| 预期问题 | BGE sidecar 首启会比公开客服短超时更慢；若重建路径沿用短窗口，管理员会看到同步失败，且旧规则可能在版本切换中产生不一致风险。 |
+| 当前应对与局限 | 管理员文档写入使用受控的冷启动重试窗口，公开客服仍可在短超时后降级到 Node TF-IDF；Python 永不接收订单、用户、Cookie 或密钥。请求内模式适合当前单文件不超过 100KB 的小规模演示语料；当文档数量或耗时上升时，应以容量数据为依据迁移到持久队列。 |
+| 验证证据 | 规则生命周期集成测试覆盖“上传 v1 → 成功同步 v2 → v1 为 superseded → 新运行实例 bootstrap → 客服只引用 v2 → 失效 v2 后不再引用”；完整回归为 42 项 TypeScript 与 7 项 Python Agent 测试。 |
+
+> **面试追问：为什么不能先把旧规则下线，再尝试同步新规则？**  
+> 这样会在新规则向量化、网络或模型加载失败时制造知识空窗。CampusMate 采用“新版本先成功同步、旧版本后 supersede”的顺序：事实源保留两份历史，Chroma 仅删除已确认被替代的旧版本分块。
+
+> **面试追问：为什么当前不使用消息队列？**  
+> 管理员规则变更频率低、单文件限制为 100KB，作品集场景更需要操作结果立即可见和失败可复现，因此采用请求内同步。代价是批量重建不能无限扩展；未来应先采集文档数、耗时和失败率，再引入持久队列、幂等任务和状态看板，而不是为了堆技术名词提前复杂化。

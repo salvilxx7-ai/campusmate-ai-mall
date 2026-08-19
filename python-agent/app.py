@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import uuid
 from pathlib import Path
 from typing import Annotated, Literal, TypedDict
 
@@ -20,6 +21,7 @@ EMBEDDING_DIMENSION = 512
 TOP_K = 3
 GROUNDING_THRESHOLD = 0.25
 INDEX_VERSION = "bge-small-zh-v1.5-fastembed-260-48-v1"
+RUNTIME_INSTANCE_ID = uuid.uuid4().hex
 
 
 class RouteRequest(BaseModel):
@@ -48,6 +50,12 @@ class IndexDocumentResponse(BaseModel):
     collectionCount: int
     indexVersion: str
     embeddingBackend: Literal["fastembed-bge"]
+
+
+class RemoveDocumentResponse(BaseModel):
+    documentId: int
+    collectionCount: int
+    indexVersion: str
 
 
 class WorkflowStep(BaseModel):
@@ -244,6 +252,7 @@ def health() -> dict[str, object]:
         "embeddingBackend": EMBEDDING_BACKEND,
         "embeddingDimension": EMBEDDING_DIMENSION,
         "indexVersion": INDEX_VERSION,
+        "runtimeInstanceId": RUNTIME_INSTANCE_ID,
     }
 
 
@@ -277,6 +286,18 @@ def index_document(request: IndexDocumentRequest) -> IndexDocumentResponse:
         collectionCount=COLLECTION.count(),
         indexVersion=INDEX_VERSION,
         embeddingBackend="fastembed-bge",
+    )
+
+
+@app.delete("/v1/index/documents/{document_id}", response_model=RemoveDocumentResponse)
+def remove_document(document_id: int) -> RemoveDocumentResponse:
+    if document_id <= 0:
+        raise HTTPException(status_code=422, detail="document id must be positive")
+    COLLECTION.delete(where={"documentId": str(document_id)})
+    return RemoveDocumentResponse(
+        documentId=document_id,
+        collectionCount=COLLECTION.count(),
+        indexVersion=INDEX_VERSION,
     )
 
 

@@ -78,3 +78,9 @@
 - [x] Add an admin-path test proving a newly accepted public rule is retrievable through the Node customer-service flow after Chroma sync.
 - [x] Inline the complete marketplace end-to-end business, data, failure-response, and interview-deep-dive record in the engineering log itself.
 - [x] Add a success-path integration test through the actual admin tRPC upload/retry procedures that persists vector status and proves the Node customer-service flow cites the new rule.
+- [x] Audit current Chroma bootstrap behavior, knowledge-document lifecycle, audit schema, and admin controls before extending index operations.
+- [x] Design persistent document version, lifecycle, and batch-rebuild state that preserves source provenance and prevents stale rules from being cited.
+- [x] Implement Python startup bootstrap from Node-approved document payloads, including indexed-count health evidence and safe fallback on partial failure.
+- [x] Implement administrator rule-document replacement, deactivation/deletion audit, bulk rebuild trigger, and observable rebuild progress without exposing private data to Python.
+- [x] Add recovery, lifecycle, authorization, and stale-citation tests; update full business-flow and interview logs with operational trade-offs.
+- [x] Implement the user-confirmed lightweight rebuild path: request-scoped bootstrap and administrator-triggered synchronous batch rebuild, without a persistent queue worker.

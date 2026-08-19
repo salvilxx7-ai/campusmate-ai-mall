@@ -18,11 +18,11 @@ CampusMate 不是一个只展示页面效果的商城 Demo，而是一套用于�
 
 当前项目是 **React 19 + TypeScript + Tailwind CSS + Express 4 + tRPC 11 + Drizzle ORM + MySQL/TiDB + Python FastAPI + LangGraph + Chroma + FastEmbed ONNX** 双运行时应用。Python 服务只处理公开问题的意图路由与 Chroma 演示规则召回，使用 `BAAI/bge-small-zh-v1.5` 预训练中文语义 Embedding；Node 网关保留 OAuth、LLM 密钥、订单与工单工具，并保留语料级 TF-IDF/余弦检索作为安全回退。检索、引用、阈值判断、订单所有权与工单权限均由服务端程序控制。
 
-> **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph、Chroma 和预训练中文语义 Embedding 项目；管理员上传的 HTTPS 公开规则会在当前 sidecar 运行时增量同步至 Chroma，并有状态、失败摘要和管理员重试。必须同时说明 Chroma 是容器本地派生索引，容器重建后仍需重建或 bootstrap。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
+> **真实性红线：** 当前版本可以描述为 Python、FastAPI、LangGraph、Chroma 和预训练中文语义 Embedding 项目；管理员上传的 HTTPS 公开规则会在当前 sidecar 运行时增量同步至 Chroma，并有状态、失败摘要、管理员重试、版本替换与失效审计。每个新的 Python 运行实例会在首次公开规则请求前 bootstrap 当前 `active + ready + synced` 文档；必须同时说明 Chroma 是容器本地派生索引，MySQL/对象存储才是事实源。PHP、“15 个核心页面”与“页面加载 2 秒内”仍不得写入简历，因为没有相应实现或测量报告。
 
 | 能力 | 当前真实实现 | 不应混淆的替代表述 |
 |---|---|---|
-| 文档处理 | Markdown/TXT 上传；对象存储和 MySQL 保留事实记录；管理员 HTTPS 公开规则由 Node 增量写入 Python Chroma，Python 使用带重叠的滑动窗口。 | Chroma 为容器本地派生索引，未实现容器启动后的自动全量重建。 |
+| 文档处理 | Markdown/TXT 上传；对象存储和 MySQL 保留事实记录；管理员 HTTPS 公开规则由 Node 增量写入 Python Chroma，Python 使用带重叠的滑动窗口；规则具备 `active/superseded/retired` 生命周期、请求内 bootstrap 与同步批量重建。 | Chroma 为容器本地派生索引；bootstrap 由首次公开规则请求触发，当前不使用常驻异步队列，适用于受控的小规模演示语料。 |
 | 检索 | Python Chroma 通过 FastEmbed ONNX 运行 `BAAI/bge-small-zh-v1.5` 的 512 维预训练中文语义向量 Top-K；Node TF-IDF/余弦仅作回退，均返回分数和来源。 | 固定 5 题演示集为 BGE 4/5、哈希 3/5，不能外推为生产准确率。 |
 | Agent | LangGraph 状态图：接收 → 意图 → Chroma 检索/交还 Node 网关；Node 执行受控工具。 | 不是原生大模型 Function Calling。 |
 | 工具 | 服务端商品检索、本人订单查询和模拟工单创建/查询。 | 工具由业务代码直接受控调用，不是模型任意访问数据库。 |

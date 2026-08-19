@@ -15,6 +15,7 @@ def test_health_exposes_real_runtime_and_seeded_chroma_collection():
     assert body["embeddingModel"] == "BAAI/bge-small-zh-v1.5"
     assert body["embeddingBackend"] == "fastembed-bge"
     assert body["embeddingDimension"] == 512
+    assert isinstance(body["runtimeInstanceId"], str) and len(body["runtimeInstanceId"]) == 32
 
 
 def test_policy_question_uses_langgraph_and_returns_chroma_citations():
@@ -65,6 +66,11 @@ def test_admin_public_rule_upsert_is_idempotent_and_becomes_retrievable():
     response = client.post("/v1/route", json={"message": "活动票券要写清楚什么？"})
     assert response.status_code == 200
     assert any(item["title"] == "管理员补充演示规则" for item in response.json()["citations"])
+    removed = client.delete("/v1/index/documents/998")
+    assert removed.status_code == 200
+    assert removed.json()["documentId"] == 998
+    after_removal = client.post("/v1/route", json={"message": "活动票券要写清楚什么？"})
+    assert all(item["title"] != "管理员补充演示规则" for item in after_removal.json()["citations"])
 
 
 def test_index_endpoint_rejects_non_public_source_url():

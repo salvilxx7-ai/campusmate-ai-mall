@@ -27,9 +27,10 @@ import { buildOrderReadAuditEvent } from "./security/orderAudit";
 import { resolveOrderRead, resolveOwnerOrderList } from "./security/orderAuditFlow";
 import { decideOrderAccess } from "./security/orderAccess";
 import { storageGetSignedUrl, storagePut } from "./storage";
-import { indexPublicKnowledgeDocument } from "./agent/pythonAgentGateway";
+import { getPythonAgentHealth, indexPublicKnowledgeDocument, removePublicKnowledgeDocument } from "./agent/pythonAgentGateway";
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let bootstrappedPythonRuntimeId: string | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
@@ -136,6 +137,10 @@ export async function listKnowledgeDocuments() {
   return db.select().from(knowledgeDocuments).orderBy(asc(knowledgeDocuments.createdAt));
 }
 
+function isBuiltinSeedDocument(storageKey: string) {
+  return storageKey.startsWith("docs/knowledge-base/");
+}
+
 function contentFingerprint(content: string) {
   return createHash("sha256").update(content, "utf8").digest("hex");
 }
@@ -147,12 +152,38 @@ async function loadStoredKnowledgeContent(storageKey: string) {
   return (await response.text()).trim();
 }
 
+export async function bootstrapActiveKnowledgeIntoChroma() {
+  const health = await getPythonAgentHealth();
+  if (!health || health.embeddingBackend !== "fastembed-bge") return { status: "unavailable" as const, total: 0, succeeded: 0, failed: 0 };
+  if (bootstrappedPythonRuntimeId === health.runtimeInstanceId) return { status: "already_current" as const, total: 0, succeeded: 0, failed: 0 };
+  const db = await getDb();
+  if (!db) return { status: "unavailable" as const, total: 0, succeeded: 0, failed: 0 };
+  const documents = await db.select().from(knowledgeDocuments).where(and(eq(knowledgeDocuments.lifecycleStatus, "active"), eq(knowledgeDocuments.processingStatus, "ready"), eq(knowledgeDocuments.vectorIndexStatus, "synced")));
+  const rebuildable = documents.filter(document => !isBuiltinSeedDocument(document.storageKey));
+  let succeeded = 0;
+  let failed = 0;
+  for (const document of rebuildable) {
+    try {
+      const content = await loadStoredKnowledgeContent(document.storageKey);
+      const indexed = await indexPublicKnowledgeDocument({ documentId: document.id, title: document.title, sourceLabel: `管理员上传｜${document.title}`, sourceUrl: document.sourceUrl, content, contentFingerprint: contentFingerprint(content) });
+      if (!indexed) throw new Error("Python 索引不可用");
+      succeeded += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn(`[KnowledgeBootstrap] 文档 #${document.id} 重建失败：${error instanceof Error ? error.message : "unknown"}`);
+    }
+  }
+  if (failed === 0) bootstrappedPythonRuntimeId = health.runtimeInstanceId;
+  return { status: failed === 0 ? "rebuilt" as const : "partial" as const, total: rebuildable.length, succeeded, failed };
+}
+
 export async function syncKnowledgeDocumentToChroma(input: { documentId: number; actorUserId: number }) {
   const db = await getDb();
   if (!db) throw new Error("数据库暂不可用");
   const rows = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, input.documentId)).limit(1);
   const document = rows[0];
   if (!document) throw new Error("未找到待同步的知识文档");
+  if (document.lifecycleStatus !== "active") throw new Error("已替代或已失效的规则文档不能同步至 Chroma");
   if (!document.sourceUrl.startsWith("https://")) throw new Error("只有带 HTTPS 公开来源的规则文档可以同步至 Chroma");
 
   await db.update(knowledgeDocuments).set({ vectorIndexStatus: "syncing", vectorIndexError: null }).where(eq(knowledgeDocuments.id, document.id));
@@ -168,6 +199,17 @@ export async function syncKnowledgeDocumentToChroma(input: { documentId: number;
       contentFingerprint: fingerprint,
     });
     if (!indexed) throw new Error("Python Chroma 索引服务未就绪或拒绝本次同步");
+    if (document.supersedesDocumentId) {
+      const previous = (await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, document.supersedesDocumentId)).limit(1))[0];
+      if (!previous || previous.lifecycleStatus !== "active") throw new Error("待替代的旧规则已不存在或不处于有效状态");
+      const removed = await removePublicKnowledgeDocument(previous.id);
+      if (!removed) {
+        await removePublicKnowledgeDocument(document.id);
+        throw new Error("无法从当前 Chroma 运行时安全移除旧规则，已撤回新版本索引");
+      }
+      await db.update(knowledgeDocuments).set({ lifecycleStatus: "superseded", retiredAt: new Date(), retiredReason: `已被规则文档 #${document.id} 替代` }).where(eq(knowledgeDocuments.id, previous.id));
+      await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.version.replace", resourceType: "knowledge_document", resourceId: String(previous.id), outcome: "allowed", reason: `superseded_by_${document.id}` });
+    }
     await db.update(knowledgeDocuments).set({
       contentFingerprint: fingerprint,
       vectorIndexStatus: "synced",
@@ -185,6 +227,40 @@ export async function syncKnowledgeDocumentToChroma(input: { documentId: number;
   }
 }
 
+export async function rebuildActiveKnowledgeDocuments(input: { actorUserId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const documents = await db.select().from(knowledgeDocuments).where(and(eq(knowledgeDocuments.lifecycleStatus, "active"), eq(knowledgeDocuments.processingStatus, "ready")));
+  const rebuildable = documents.filter(document => !isBuiltinSeedDocument(document.storageKey));
+  let succeeded = 0;
+  let failed = 0;
+  const failures: Array<{ documentId: number; reason: string }> = [];
+  for (const document of rebuildable) {
+    try {
+      await syncKnowledgeDocumentToChroma({ documentId: document.id, actorUserId: input.actorUserId });
+      succeeded += 1;
+    } catch (error) {
+      failed += 1;
+      failures.push({ documentId: document.id, reason: error instanceof Error ? error.message.slice(0, 160) : "未知错误" });
+    }
+  }
+  await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.vector.rebuild", resourceType: "knowledge_collection", outcome: failed ? "denied" : "allowed", reason: `total=${rebuildable.length};succeeded=${succeeded};failed=${failed}` });
+  return { total: rebuildable.length, succeeded, failed, failures };
+}
+
+export async function retireKnowledgeDocument(input: { documentId: number; actorUserId: number; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const document = (await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, input.documentId)).limit(1))[0];
+  if (!document) throw new Error("未找到规则文档");
+  if (document.lifecycleStatus !== "active") throw new Error("该规则已经替代或失效");
+  const removed = await removePublicKnowledgeDocument(document.id);
+  if (!removed) throw new Error("Python Chroma 当前不可用，无法安全失效规则；请稍后重试");
+  await db.update(knowledgeDocuments).set({ lifecycleStatus: "retired", retiredAt: new Date(), retiredReason: input.reason.slice(0, 255), vectorIndexStatus: "pending", vectorIndexError: "规则已失效并从当前 Chroma 索引移除" }).where(eq(knowledgeDocuments.id, document.id));
+  await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.retire", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "allowed", reason: input.reason.slice(0, 255) });
+  return { documentId: document.id, status: "retired" as const };
+}
+
 export async function uploadKnowledgeDocument(input: {
   actorUserId: number;
   fileName: string;
@@ -192,6 +268,7 @@ export async function uploadKnowledgeDocument(input: {
   sourceType: "policy" | "after_sales" | "faq";
   publicSourceUrl: string;
   base64Content: string;
+  supersedesDocumentId?: number;
 }) {
   const db = await getDb();
   if (!db) throw new Error("数据库暂不可用");
@@ -201,6 +278,12 @@ export async function uploadKnowledgeDocument(input: {
   if (content.length < 20) throw new Error("文档内容过短，无法建立可引用知识库");
   if (content.length > 100_000) throw new Error("演示版单个文档最多 100KB");
   if (!input.publicSourceUrl.startsWith("https://")) throw new Error("请提供 HTTPS 格式的公开规则来源 URL");
+  let nextVersion = 1;
+  if (input.supersedesDocumentId) {
+    const previous = (await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.id, input.supersedesDocumentId)).limit(1))[0];
+    if (!previous || previous.lifecycleStatus !== "active") throw new Error("只能替换当前有效的规则文档");
+    nextVersion = previous.version + 1;
+  }
   const stored = await storagePut(`knowledge/${input.actorUserId}/${safeName}`, content, input.mimeType);
   await db.insert(knowledgeDocuments).values({
     title: safeName.replace(/\.(md|txt)$/i, ""),
@@ -210,6 +293,8 @@ export async function uploadKnowledgeDocument(input: {
     processingStatus: "pending",
     contentFingerprint: contentFingerprint(content),
     vectorIndexStatus: "pending",
+    version: nextVersion,
+    supersedesDocumentId: input.supersedesDocumentId,
     uploadedByUserId: input.actorUserId,
   });
   const created = await db.select().from(knowledgeDocuments).where(eq(knowledgeDocuments.storageKey, stored.key)).limit(1);
@@ -228,7 +313,7 @@ export async function uploadKnowledgeDocument(input: {
     });
   }
   await db.update(knowledgeDocuments).set({ processingStatus: "ready" }).where(eq(knowledgeDocuments.id, document.id));
-  await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.upload", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "allowed", reason: input.sourceType });
+  await writeAuditLog({ actorUserId: input.actorUserId, action: "knowledge.upload", resourceType: "knowledge_document", resourceId: String(document.id), outcome: "allowed", reason: input.supersedesDocumentId ? `replacement_for_${input.supersedesDocumentId}` : input.sourceType });
   let syncResult: Awaited<ReturnType<typeof syncKnowledgeDocumentToChroma>>;
   try {
     syncResult = await syncKnowledgeDocumentToChroma({ documentId: document.id, actorUserId: input.actorUserId });
@@ -236,7 +321,7 @@ export async function uploadKnowledgeDocument(input: {
     const message = error instanceof Error ? error.message : "未知索引错误";
     return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: input.publicSourceUrl, storageUrl: stored.url, vectorIndexStatus: "failed" as const, syncError: message };
   }
-  return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: input.publicSourceUrl, storageUrl: stored.url, vectorIndexStatus: syncResult.status, indexVersion: syncResult.indexVersion };
+  return { id: document.id, title: document.title, chunkCount: chunks.length, sourceUrl: input.publicSourceUrl, storageUrl: stored.url, vectorIndexStatus: syncResult.status, indexVersion: syncResult.indexVersion, version: nextVersion };
 }
 
 export async function searchKnowledgeBase(question: string) {
@@ -247,7 +332,7 @@ export async function searchKnowledgeBase(question: string) {
     .select({ chunk: knowledgeChunks, document: knowledgeDocuments })
     .from(knowledgeChunks)
     .innerJoin(knowledgeDocuments, eq(knowledgeChunks.documentId, knowledgeDocuments.id))
-    .where(eq(knowledgeDocuments.processingStatus, "ready"));
+    .where(and(eq(knowledgeDocuments.processingStatus, "ready"), eq(knowledgeDocuments.lifecycleStatus, "active")));
   return searchChunks(question, rows.map(row => ({
     id: row.chunk.id,
     documentId: row.document.id,

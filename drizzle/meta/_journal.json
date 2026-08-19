@@ -50,6 +50,13 @@
       "when": 1787123399960,
       "tag": "0006_jazzy_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1787124730781,
+      "tag": "0007_dapper_johnny_storm",
+      "breakpoints": true
     }
   ]
 }

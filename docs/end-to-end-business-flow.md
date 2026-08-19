@@ -4,7 +4,7 @@
 
 本文件用于回答面试中最容易连续追问的五类问题：**用户从哪里进入、每一步写了什么数据、谁能读取、失败时怎么办、为什么这样设计**。演示时不必逐字背诵；应按用户路径打开对应页面，再用下表解释服务端约束。
 
-> **一句话完整业务闭环：** 学生公开浏览演示商品，完成 OAuth 登录后创建模拟订单；订单和发布物品只进入本人空间；AI 客服对公开规则走 FastAPI/LangGraph/Chroma 语义检索，对商品、本人订单和转人工走 Node 受控工具；管理员维护公开来源规则并将其增量同步至 Chroma；固定评测和审计为关键安全路径保留证据。
+> **一句话完整业务闭环：** 学生公开浏览演示商品，完成 OAuth 登录后创建模拟订单；订单和发布物品只进入本人空间；AI 客服对公开规则走 FastAPI/LangGraph/Chroma 语义检索，对商品、本人订单和转人工走 Node 受控工具；管理员维护公开来源规则的版本、生命周期与 Chroma 派生索引；固定评测和审计为关键安全路径保留证据。
 
 ## 1. 参与者与数据资产
 
@@ -12,13 +12,13 @@
 |---|---|---|---|
 | 访客 | 浏览商品、搜索、查看公开规则客服体验。 | 创建订单、查询订单、创建/查看工单、访问管理台。 | `publicProcedure` 与登录门槛 UI。 |
 | 普通登录用户 | 创建模拟订单、查看本人订单和个人中心、查询“我的订单”、创建本人模拟工单。 | 指定别人的 `userId`、读取他人订单/工单、管理知识库。 | OAuth 会话中的 `ctx.user.id`、所有权查询和 `protectedProcedure`。 |
-| 管理员 | 管理演示商品、初始化/上传公开来源规则、查看索引状态、重试 Chroma 同步、运行固定评测。 | 绕过上传来源约束或把个人订单数据发送给 Python Agent。 | `adminProcedure`、HTTPS 来源验证、Node→Python 白名单字段。 |
+| 管理员 | 管理演示商品、初始化/上传/替换/失效公开来源规则、查看索引状态、重试或批量重建 Chroma、运行固定评测。 | 绕过上传来源约束或把个人订单数据发送给 Python Agent。 | `adminProcedure`、HTTPS 来源验证、Node→Python 白名单字段。 |
 | Python Agent | 路由公开问题、BGE 语义检索、返回引用。 | 读取 Cookie、OAuth/JWT、MySQL、订单、工单、LLM 密钥。 | localhost sidecar、窄请求契约与 Node 网关。 |
 
 | 核心资产 | 事实来源 | 读写规则 |
 |---|---|---|
 | 商品、订单、订单项、个人中心 | MySQL/TiDB。 | 商品公开读；订单按会话用户 ID 查询；订单详情拒绝越权并审计。 |
-| 规则文档与原文件 | 对象存储 + `knowledgeDocuments`。 | 管理员上传；保存公开来源 URL、存储键、处理和向量索引状态。 |
+| 规则文档与原文件 | 对象存储 + `knowledgeDocuments`。 | 管理员上传；保存公开来源 URL、存储键、处理/向量状态、版本、替代关系与 `active/superseded/retired` 生命周期。 |
 | 分块与词项回退 | `knowledgeChunks`。 | Node TF-IDF 仅作为 Python 不可用时的安全回退。 |
 | 语义检索索引 | Python Chroma 容器本地派生索引。 | 仅含公开规则；由 MySQL/对象存储重建，不作为事实源。 |
 | 审计与评测 | `auditLogs`、`evaluationRuns`。 | 审计只追加；评测保存实际结果，不手写百分比。 |
@@ -49,15 +49,17 @@
 > **面试追问：为什么不用 Python 直接连接 MySQL？**  
 > 订单权限与 OAuth 已在 Node/tRPC 经过验证。复制数据库凭据和订单读取能力到 Python 会扩大攻击面；让 Python 只编排公开检索、Node 继续控制受保护工具，符合最小权限。
 
-## 4. 管理员规则上传与 Chroma 增量同步
+## 4. 管理员规则生命周期与 Chroma 同步运维
 
 | 顺序 | 管理员动作 | 服务端状态变化 | 可观测结果与失败处理 |
 |---:|---|---|---|
 | 1 | 选择 `.md`/`.txt`、规则类型，并填写 HTTPS 公开来源 URL。 | 浏览器将文件内容、类型和来源提交到 `adminProcedure`。 | 不接受 PDF、超过 100KB、非 HTTPS 来源或普通用户请求。 |
-| 2 | 上传。 | Node 写入对象存储；创建 `knowledgeDocuments`；分块写入 `knowledgeChunks`；计算 SHA-256 指纹。 | 文档状态从 `pending` 到 `ready`；对象存储/数据库仍是事实来源。 |
-| 3 | 触发索引。 | Node 将 `documentId`、标题、公开来源、正文和指纹发送给 localhost FastAPI；Python 以 `documentId + fingerprint + chunkIndex` 进行 Chroma upsert。 | `vectorIndexStatus` 变为 `syncing → synced`，记录索引版本、时间和分块数。 |
-| 4 | 客服询问新规则。 | Chroma 在同一运行时已经有新分块，BGE Top-K 可返回新来源。 | 管理台仅在 `synced` 时标记“新规则已生效”。 |
-| 5 | Python 未就绪、模型异常或同步失败。 | Node 写入 `vectorIndexStatus = failed` 与错误摘要，并追加审计。 | 管理员可点“重试同步”；既有规则、TF-IDF 回退和所有订单边界继续有效。 |
+| 2 | 上传或指定旧文档进行版本替换。 | Node 写入对象存储；创建新的 `knowledgeDocuments` 版本、`supersedesDocumentId`、分块与 SHA-256 指纹。 | 文档状态从 `pending` 到 `ready`；对象存储/数据库仍是事实来源，旧规则在新版本成功前保持 `active`。 |
+| 3 | 同步新版本。 | Node 将 `documentId`、标题、公开来源、正文和指纹发送给 localhost FastAPI；Python 以 `documentId + fingerprint + chunkIndex` 进行 Chroma upsert。 | `vectorIndexStatus` 变为 `syncing → synced`，记录索引版本、时间和分块数。 |
+| 4 | 新规则同步成功。 | 若为替换，Node 将旧版本改为 `superseded`，再请求 Python 删除旧 `documentId` 的 Chroma 分块；新版本继续 `active`。 | 客服只可引用新版本；替换链路与每次删除均有审计。 |
+| 5 | 管理员主动失效规则。 | Node 保留原文、失效原因和时间，将文档标记为 `retired`，并请求 Python 删除对应 Chroma 分块。 | 失效规则不再作为 Node 或 Chroma 规则证据；管理台展示生命周期状态。 |
+| 6 | 点击批量重建，或 Python 运行实例变化后首次接收公开规则请求。 | Node 逐份读取 `active + ready + synced` 公开规则，当前管理员请求内重发 upsert；首次公开规则请求按 `runtimeInstanceId` 执行 bootstrap。 | 返回 `total/succeeded/failed`；部分失败不阻断其他文档，公开客服可回退到 TF-IDF。 |
+| 7 | Python 未就绪、模型异常或同步失败。 | Node 写入 `vectorIndexStatus = failed` 与错误摘要，并追加审计。 | 管理员可点“重试同步”；既有规则、TF-IDF 回退和所有订单边界继续有效。 |
 
 > **面试追问：为什么不能只显示“上传成功”？**  
 > 上传成功只表示对象存储和数据库事实记录成功，不等于派生向量索引可检索。将文档处理状态与向量索引状态分开，能够避免管理员把尚未生效的规则误认为已由客服使用。
@@ -72,7 +74,7 @@
 
 | 边界 | 当前状态 | 下一步方向 |
 |---|---|---|
-| Chroma 持久性 | 索引是 Python 容器本地派生数据；容器重建后需要从 MySQL/对象存储重新同步。 | 增加启动 bootstrap 或队列化全量重建。 |
-| 上传文档更新/删除 | 当前主流程覆盖新增与同一文档的幂等重试；尚未提供完整编辑/删除 UI。 | 设计文档版本、失效标记和 Chroma 删除审计。 |
+| Chroma 持久性 | 索引是 Python 容器本地派生数据；新运行实例会在首次公开规则请求前从 MySQL/对象存储事实记录 bootstrap 当前有效规则。 | 采集不同规模的恢复耗时；当请求内重建不再合适时，再迁移到持久队列。 |
+| 上传文档更新/删除 | 管理台支持新增、版本替换、失效和同步批量重建；`superseded/retired` 规则不会再被引用。 | 增加可视化版本历史与更细粒度的编辑能力。 |
 | 检索效果评估 | 有 5 条演示同义问题的 BGE/哈希对比。 | 扩展人工标注集，记录 Recall@K、MRR 与人工评审。 |
 | 工单处理 | 只模拟创建与本人查看。 | 实现管理员队列、状态流转与通知模拟。 |

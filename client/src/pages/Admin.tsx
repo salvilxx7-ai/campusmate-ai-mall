@@ -17,6 +17,7 @@ function AdminContent() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [uploadType, setUploadType] = useState<"policy" | "after_sales" | "faq">("policy");
   const [publicSourceUrl, setPublicSourceUrl] = useState("");
+  const [supersedesDocumentId, setSupersedesDocumentId] = useState<number | undefined>();
   const products = trpc.admin.products.useQuery();
   const knowledgeDocuments = trpc.admin.knowledgeDocuments.useQuery();
   const seed = trpc.admin.seedDemoCatalog.useMutation({
@@ -49,6 +50,7 @@ function AdminContent() {
       void utils.admin.knowledgeDocuments.invalidate();
       if (uploadInputRef.current) uploadInputRef.current.value = "";
       setPublicSourceUrl("");
+      setSupersedesDocumentId(undefined);
     },
     onError: error => toast.error("文档上传失败", { description: error.message }),
   });
@@ -58,6 +60,20 @@ function AdminContent() {
       void utils.admin.knowledgeDocuments.invalidate();
     },
     onError: error => toast.error("同步失败", { description: error.message }),
+  });
+  const rebuildKnowledge = trpc.admin.rebuildKnowledgeVectorIndex.useMutation({
+    onSuccess: result => {
+      toast.success("批量重建已完成", { description: `成功 ${result.succeeded}/${result.total} 份规则${result.failed ? `，失败 ${result.failed} 份` : ""}。` });
+      void utils.admin.knowledgeDocuments.invalidate();
+    },
+    onError: error => toast.error("批量重建失败", { description: error.message }),
+  });
+  const retireKnowledge = trpc.admin.retireKnowledgeDocument.useMutation({
+    onSuccess: () => {
+      toast.success("规则已失效", { description: "已从当前 Chroma 索引移除，并保留审计记录。" });
+      void utils.admin.knowledgeDocuments.invalidate();
+    },
+    onError: error => toast.error("规则失效失败", { description: error.message }),
   });
 
   const handleKnowledgeFile = (file?: File) => {
@@ -81,7 +97,7 @@ function AdminContent() {
         toast.error("无法读取文档内容");
         return;
       }
-      uploadKnowledge.mutate({ fileName: file.name, mimeType: file.name.endsWith(".md") ? "text/markdown" : "text/plain", sourceType: uploadType, publicSourceUrl, base64Content: content });
+      uploadKnowledge.mutate({ fileName: file.name, mimeType: file.name.endsWith(".md") ? "text/markdown" : "text/plain", sourceType: uploadType, publicSourceUrl, base64Content: content, supersedesDocumentId });
     };
     reader.readAsDataURL(file);
   };
@@ -89,6 +105,7 @@ function AdminContent() {
   const items = (products.data ?? []) as CatalogProduct[];
   const activeCount = items.filter(item => item.product.status === "active").length;
   const reservedCount = items.filter(item => item.product.status === "reserved").length;
+  const replaceableDocuments = (knowledgeDocuments.data ?? []).filter(document => document.lifecycleStatus === "active" && !document.storageKey.startsWith("docs/knowledge-base/"));
 
   return <div className="mx-auto max-w-6xl space-y-7 pb-10">
     <section className="overflow-hidden rounded-[1.75rem] bg-primary p-7 text-primary-foreground shadow-[0_22px_54px_-32px_rgba(45,33,60,0.85)] sm:p-9">
@@ -108,7 +125,21 @@ function AdminContent() {
       <div className="mt-6 overflow-x-auto"><table className="w-full min-w-[680px] text-left text-sm"><thead className="border-y border-border bg-secondary/35 text-xs font-semibold text-muted-foreground"><tr><th className="px-4 py-3">商品</th><th className="px-4 py-3">分类</th><th className="px-4 py-3">价格</th><th className="px-4 py-3">状态</th><th className="px-4 py-3 text-right">操作</th></tr></thead><tbody>{items.map(item => <tr key={item.product.id} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-4 font-medium text-foreground">{item.product.title}</td><td className="px-4 py-4 text-muted-foreground">{item.category.name}</td><td className="px-4 py-4 font-mono font-semibold">{formatPrice(item.product.priceCents)}</td><td className="px-4 py-4"><Badge variant="secondary" className="font-normal">{statusLabel[item.product.status]}</Badge></td><td className="px-4 py-4 text-right">{item.product.status === "archived" ? <Button size="sm" className="rounded-lg" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ productId: item.product.id, status: "active" })}>重新上架</Button> : <Button size="sm" variant="outline" className="rounded-lg" disabled={statusMutation.isPending} onClick={() => statusMutation.mutate({ productId: item.product.id, status: "archived" })}>下架</Button>}</td></tr>)}</tbody></table></div>
     </section>
 
-    <section id="knowledge" className="rounded-[1.5rem] border border-border bg-card p-5 sm:p-7"><div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-center"><div className="flex gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><BookOpen className="size-5" /></span><div><p className="text-xs font-semibold tracking-[0.14em] text-primary">KNOWLEDGE BASE</p><h2 className="mt-1 font-display text-2xl font-bold tracking-[-0.04em]">规则知识库</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">公开规则文档先保存为对象存储与数据库事实记录，再由管理员服务端增量写入 FastAPI/Chroma 的 BGE 中文语义索引；仅显示“已同步”后才可承诺新规则已生效。</p></div></div><Button variant="outline" className="rounded-xl" onClick={() => seedKnowledge.mutate()} disabled={seedKnowledge.isPending}><Upload className="mr-2 size-4" />{seedKnowledge.isPending ? "正在初始化…" : "初始化演示规则"}</Button></div><div className="mt-5 flex flex-col gap-3 rounded-xl border border-dashed border-primary/25 bg-secondary/20 p-4"><input ref={uploadInputRef} type="file" accept=".md,.txt,text/plain,text/markdown" className="hidden" onChange={event => handleKnowledgeFile(event.target.files?.[0])} /><select value={uploadType} onChange={event => setUploadType(event.target.value as "policy" | "after_sales" | "faq")} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"><option value="policy">交易规则</option><option value="after_sales">售后说明</option><option value="faq">FAQ</option></select><input type="url" value={publicSourceUrl} onChange={event => setPublicSourceUrl(event.target.value)} placeholder="https://公开规则来源" className="h-10 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground" /><Button className="rounded-xl" onClick={() => uploadInputRef.current?.click()} disabled={uploadKnowledge.isPending}><Upload className="mr-2 size-4" />{uploadKnowledge.isPending ? "正在同步…" : "上传并同步 Chroma"}</Button><p className="text-xs text-muted-foreground">仅接受 .md/.txt、100KB 内且具有 HTTPS 公开来源的演示规则；不会传递用户、订单或密钥。</p></div><div className="mt-6 grid gap-3 md:grid-cols-3">{(knowledgeDocuments.data ?? []).map(document => <div key={document.id} className="rounded-xl border border-border bg-secondary/20 p-4"><div className="flex items-start justify-between gap-2"><p className="font-medium text-foreground">{document.title}</p><Badge variant={document.vectorIndexStatus === "synced" ? "secondary" : "outline"} className="shrink-0 font-normal">{document.vectorIndexStatus === "synced" ? "Chroma 已同步" : document.vectorIndexStatus === "failed" ? "同步失败" : document.vectorIndexStatus === "syncing" ? "同步中" : "待同步"}</Badge></div><p className="mt-2 text-xs text-muted-foreground">文档：{document.processingStatus === "ready" ? "已分块" : document.processingStatus} · 索引：{document.vectorIndexVersion ?? "未建立"}</p>{document.vectorIndexError ? <p className="mt-2 text-xs leading-5 text-destructive">{document.vectorIndexError}</p> : null}<div className="mt-3 flex items-center gap-3"><a className="text-xs font-medium text-primary hover:underline" href={document.sourceUrl} target="_blank" rel="noreferrer">查看公开来源</a>{document.vectorIndexStatus !== "synced" ? <Button size="sm" variant="outline" className="h-7 rounded-lg text-xs" onClick={() => retryVectorSync.mutate({ documentId: document.id })} disabled={retryVectorSync.isPending}>{retryVectorSync.isPending ? "同步中…" : "重试同步"}</Button> : null}</div></div>)}</div></section>
+    <section id="knowledge" className="rounded-[1.5rem] border border-border bg-card p-5 sm:p-7">
+      <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-center">
+        <div className="flex gap-4"><span className="grid size-11 shrink-0 place-items-center rounded-xl bg-secondary text-primary"><BookOpen className="size-5" /></span><div><p className="text-xs font-semibold tracking-[0.14em] text-primary">KNOWLEDGE BASE</p><h2 className="mt-1 font-display text-2xl font-bold tracking-[-0.04em]">规则知识库</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">对象存储与数据库保存规则事实；当前请求可将有效公开规则写入 FastAPI/Chroma。sidecar 重启后首个规则请求会恢复有效文档，批量重建不需要常驻队列。</p></div></div>
+        <div className="flex flex-wrap gap-2"><Button variant="outline" className="rounded-xl" onClick={() => seedKnowledge.mutate()} disabled={seedKnowledge.isPending}><Upload className="mr-2 size-4" />{seedKnowledge.isPending ? "正在初始化…" : "初始化演示规则"}</Button><Button variant="outline" className="rounded-xl" onClick={() => rebuildKnowledge.mutate()} disabled={rebuildKnowledge.isPending}><RefreshCw className={`mr-2 size-4 ${rebuildKnowledge.isPending ? "animate-spin" : ""}`} />{rebuildKnowledge.isPending ? "正在逐份重建…" : "批量重建有效规则"}</Button></div>
+      </div>
+      <div className="mt-5 grid gap-3 rounded-xl border border-dashed border-primary/25 bg-secondary/20 p-4 lg:grid-cols-[0.8fr_1.2fr_1.2fr_auto]">
+        <input ref={uploadInputRef} type="file" accept=".md,.txt,text/plain,text/markdown" className="hidden" onChange={event => handleKnowledgeFile(event.target.files?.[0])} />
+        <select value={uploadType} onChange={event => setUploadType(event.target.value as "policy" | "after_sales" | "faq")} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"><option value="policy">交易规则</option><option value="after_sales">售后说明</option><option value="faq">FAQ</option></select>
+        <input type="url" value={publicSourceUrl} onChange={event => setPublicSourceUrl(event.target.value)} placeholder="https://公开规则来源" className="h-10 min-w-0 rounded-lg border border-border bg-background px-3 text-sm text-foreground" />
+        <select value={supersedesDocumentId?.toString() ?? ""} onChange={event => setSupersedesDocumentId(event.target.value ? Number(event.target.value) : undefined)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground"><option value="">新增独立规则</option>{replaceableDocuments.map(document => <option key={document.id} value={document.id}>替换：{document.title}（v{document.version}）</option>)}</select>
+        <Button className="rounded-xl" onClick={() => uploadInputRef.current?.click()} disabled={uploadKnowledge.isPending}><Upload className="mr-2 size-4" />{uploadKnowledge.isPending ? "正在同步…" : supersedesDocumentId ? "上传新版本" : "上传并同步 Chroma"}</Button>
+        <p className="lg:col-span-4 text-xs text-muted-foreground">仅接受 .md/.txt、100KB 内且具有 HTTPS 公开来源的规则。替换操作会先同步新版本，成功后才将旧版本失效；失效规则不会进入客服回退检索。</p>
+      </div>
+      <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{(knowledgeDocuments.data ?? []).map(document => <div key={document.id} className="rounded-xl border border-border bg-secondary/20 p-4"><div className="flex items-start justify-between gap-2"><p className="font-medium text-foreground">{document.title}</p><Badge variant={document.lifecycleStatus === "active" && document.vectorIndexStatus === "synced" ? "secondary" : "outline"} className="shrink-0 font-normal">{document.lifecycleStatus === "active" ? document.vectorIndexStatus === "synced" ? "Chroma 已同步" : document.vectorIndexStatus === "failed" ? "同步失败" : document.vectorIndexStatus === "syncing" ? "同步中" : "待同步" : document.lifecycleStatus === "superseded" ? "已替代" : "已失效"}</Badge></div><p className="mt-2 text-xs text-muted-foreground">v{document.version} · {document.processingStatus === "ready" ? "已分块" : document.processingStatus} · 索引：{document.vectorIndexVersion ?? "未建立"}</p>{document.supersedesDocumentId ? <p className="mt-1 text-xs text-muted-foreground">替代规则 #{document.supersedesDocumentId}</p> : null}{document.retiredReason ? <p className="mt-1 text-xs text-muted-foreground">状态说明：{document.retiredReason}</p> : null}{document.vectorIndexError ? <p className="mt-2 text-xs leading-5 text-destructive">{document.vectorIndexError}</p> : null}<div className="mt-3 flex flex-wrap items-center gap-2"><a className="text-xs font-medium text-primary hover:underline" href={document.sourceUrl} target="_blank" rel="noreferrer">查看公开来源</a>{document.lifecycleStatus === "active" && document.vectorIndexStatus !== "synced" ? <Button size="sm" variant="outline" className="h-7 rounded-lg text-xs" onClick={() => retryVectorSync.mutate({ documentId: document.id })} disabled={retryVectorSync.isPending}>{retryVectorSync.isPending ? "同步中…" : "重试同步"}</Button> : null}{document.lifecycleStatus === "active" && !document.storageKey.startsWith("docs/knowledge-base/") ? <Button size="sm" variant="outline" className="h-7 rounded-lg text-xs text-destructive hover:text-destructive" onClick={() => retireKnowledge.mutate({ documentId: document.id, reason: "管理员在规则管理台将该版本设为失效" })} disabled={retireKnowledge.isPending}>{retireKnowledge.isPending ? "处理中…" : "设为失效"}</Button> : null}</div></div>)}</div>
+    </section>
     <section className="rounded-[1.5rem] border border-border bg-secondary/30 p-5"><div className="flex gap-3"><Database className="mt-0.5 size-5 text-primary" /><div><h2 className="font-display text-lg font-bold">面试说明：为什么后台权限要双重控制？</h2><p className="mt-2 text-sm leading-6 text-muted-foreground">前端隐藏入口只避免普通用户误入；真实安全来自服务端 `adminProcedure`。即使直接构造 API 请求，服务端也会根据会话中的 `role` 返回禁止访问。</p></div></div></section>
   </div>;
 }

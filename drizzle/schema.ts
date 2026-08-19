@@ -117,6 +117,11 @@ export const knowledgeDocuments = mysqlTable(
     vectorIndexVersion: varchar("vectorIndexVersion", { length: 64 }),
     vectorIndexError: varchar("vectorIndexError", { length: 255 }),
     vectorIndexedAt: timestamp("vectorIndexedAt"),
+    lifecycleStatus: mysqlEnum("lifecycleStatus", ["active", "superseded", "retired"]).default("active").notNull(),
+    version: int("version").default(1).notNull(),
+    supersedesDocumentId: int("supersedesDocumentId"),
+    retiredAt: timestamp("retiredAt"),
+    retiredReason: varchar("retiredReason", { length: 255 }),
     uploadedByUserId: int("uploadedByUserId").notNull().references(() => users.id),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -124,6 +129,12 @@ export const knowledgeDocuments = mysqlTable(
   table => [
     index("knowledge_documents_status_idx").on(table.processingStatus),
     index("knowledge_documents_vector_status_idx").on(table.vectorIndexStatus, table.updatedAt),
+    index("knowledge_documents_lifecycle_idx").on(table.lifecycleStatus, table.processingStatus, table.updatedAt),
+    foreignKey({
+      columns: [table.supersedesDocumentId],
+      foreignColumns: [table.id],
+      name: "knowledge_documents_supersedes_fk",
+    }),
   ]
 );
 

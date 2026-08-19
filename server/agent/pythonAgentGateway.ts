@@ -34,6 +34,17 @@ export type PythonIndexDocumentResult = {
   embeddingBackend: "fastembed-bge";
 };
 
+export type PythonAgentHealth = {
+  status: "ok";
+  runtime: "fastapi-langgraph-chroma";
+  knowledgeChunkCount: number;
+  embeddingModel: string;
+  embeddingBackend: "fastembed-bge" | "legacy-hash-fallback";
+  embeddingDimension: number;
+  indexVersion: string;
+  runtimeInstanceId: string;
+};
+
 let pythonProcess: ChildProcess | undefined;
 let shutdownRegistered = false;
 
@@ -95,7 +106,7 @@ export async function routeWithPythonAgent(message: string): Promise<PythonAgent
 export async function indexPublicKnowledgeDocument(input: PythonIndexDocumentInput): Promise<PythonIndexDocumentResult | null> {
   if (!isEnabled()) return null;
   startPythonAgent();
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5_000);
     try {
@@ -115,4 +126,42 @@ export async function indexPublicKnowledgeDocument(input: PythonIndexDocumentInp
     await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
   }
   return null;
+}
+
+export async function getPythonAgentHealth(): Promise<PythonAgentHealth | null> {
+  if (!isEnabled()) return null;
+  startPythonAgent();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    try {
+      const response = await fetch(`${agentUrl()}/health`, { signal: controller.signal });
+      if (response.ok) {
+        const data = await response.json() as PythonAgentHealth;
+        if (data.status === "ok" && data.runtime === "fastapi-langgraph-chroma") return data;
+      }
+    } catch {
+      // The sidecar can still be loading the BGE model; retry the managed bootstrap path only.
+    } finally {
+      clearTimeout(timeout);
+    }
+    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)));
+  }
+  return null;
+}
+
+export async function removePublicKnowledgeDocument(documentId: number): Promise<{ documentId: number; collectionCount: number; indexVersion: string } | null> {
+  if (!isEnabled()) return null;
+  startPythonAgent();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`${agentUrl()}/v1/index/documents/${documentId}`, { method: "DELETE", signal: controller.signal });
+    if (!response.ok) return null;
+    return await response.json() as { documentId: number; collectionCount: number; indexVersion: string };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }

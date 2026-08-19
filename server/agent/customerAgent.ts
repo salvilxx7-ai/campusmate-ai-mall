@@ -81,10 +81,14 @@ async function answerPolicyQuestion(message: string, workflow: WorkflowStep[], t
 export async function answerCustomerMessage(input: { message: string; actor?: { id: number } }) {
   const workflow: WorkflowStep[] = [];
   const toolResults: ToolResult[] = [];
+  const shouldBootstrap = (process.env.NODE_ENV !== "test" && process.env.VITEST !== "true") || process.env.CAMPUSMATE_PYTHON_BOOTSTRAP === "true";
+  const bootstrap = shouldBootstrap ? await db.bootstrapActiveKnowledgeIntoChroma() : { status: "skipped" as const, total: 0, succeeded: 0, failed: 0 };
   const pythonRoute = await routeWithPythonAgent(input.message);
   const intent = pythonRoute?.intent ?? classifyCustomerIntent(input.message);
   if (pythonRoute) {
     workflow.push(...pythonRoute.workflow);
+    if (bootstrap.status === "rebuilt") append(workflow, "tool_invoked", `Python sidecar 启动后已恢复 ${bootstrap.succeeded} 份有效管理员规则索引。`);
+    if (bootstrap.status === "partial") append(workflow, "tool_invoked", `Python sidecar 已恢复 ${bootstrap.succeeded}/${bootstrap.total} 份管理员规则；失败文档不影响既有安全回退。`);
     append(workflow, "tool_invoked", "Node 网关接收 Python 路由结果；个人数据工具仍需经过 OAuth 会话校验。" );
   } else {
     append(workflow, "received", "接收用户问题，进入受控客服工作流。" );
