@@ -45,6 +45,10 @@ pids
 *.seed
 *.pid.lock
 *.bak
+.manus-logs/
+python-agent/__pycache__/
+python-agent/.venv/
+python-agent/chroma-data/
 
 # Coverage directory used by tools like istanbul
 coverage/
@@ -100,6 +104,7 @@ jspm_packages/
 # Temporary folders
 tmp/
 temp/
+docs/assets/*.mp4
 
 # Database
 *.db
