@@ -4,6 +4,10 @@ import { adminProcedure, router } from "../_core/trpc";
 
 export const adminRouter = router({
   products: adminProcedure.query(() => db.listProducts({})),
+  users: adminProcedure.query(() => db.listUsersForAdmin()),
+  updateUserRole: adminProcedure
+    .input(z.object({ userId: z.number().int().positive(), role: z.enum(["user", "admin"]) }))
+    .mutation(({ ctx, input }) => db.updateUserRoleByAdmin({ actorUserId: ctx.user.id, targetUserId: input.userId, role: input.role })),
   knowledgeDocuments: adminProcedure.query(() => db.listKnowledgeDocuments()),
   seedDemoKnowledgeBase: adminProcedure.mutation(({ ctx }) => db.seedDemoKnowledgeBase(ctx.user.id)),
   evaluationOverview: adminProcedure.query(() => db.getEvaluationOverview()),

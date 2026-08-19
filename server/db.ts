@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, like, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { createHash } from "node:crypto";
 import { nanoid } from "nanoid";
@@ -26,6 +26,7 @@ import { assertAuditMutationAllowed } from "./security/auditPolicy";
 import { buildOrderReadAuditEvent } from "./security/orderAudit";
 import { resolveOrderRead, resolveOwnerOrderList } from "./security/orderAuditFlow";
 import { decideOrderAccess } from "./security/orderAccess";
+import { decideUserRoleChange } from "./security/userRolePolicy";
 import { storageGetSignedUrl, storagePut } from "./storage";
 import { getPythonAgentHealth, indexPublicKnowledgeDocument, removePublicKnowledgeDocument } from "./agent/pythonAgentGateway";
 
@@ -657,6 +658,101 @@ export async function getPersonalCenterForUser(userId: number) {
       archivedListings: listings.filter(item => item.product.status === "archived").length,
     },
   };
+}
+
+function optionalProfileText(value: string) {
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export async function getEditableProfileForUser(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  const rows = await db
+    .select({
+      id: users.id,
+      oauthName: users.name,
+      email: users.email,
+      loginMethod: users.loginMethod,
+      profileName: users.profileName,
+      campus: users.campus,
+      major: users.major,
+      bio: users.bio,
+      role: users.role,
+      createdAt: users.createdAt,
+      lastSignedIn: users.lastSignedIn,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  const profile = rows[0];
+  if (!profile) throw new Error("未找到当前用户档案");
+  return profile;
+}
+
+export async function updateEditableProfileForUser(input: { userId: number; profileName: string; campus: string; major: string; bio: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  await db
+    .update(users)
+    .set({
+      profileName: optionalProfileText(input.profileName),
+      campus: optionalProfileText(input.campus),
+      major: optionalProfileText(input.major),
+      bio: optionalProfileText(input.bio),
+    })
+    .where(eq(users.id, input.userId));
+  await writeAuditLog({
+    actorUserId: input.userId,
+    action: "profile.update",
+    resourceType: "user_profile",
+    resourceId: String(input.userId),
+    outcome: "allowed",
+    reason: "self_service_fields_only",
+  });
+  return getEditableProfileForUser(input.userId);
+}
+
+export async function listUsersForAdmin() {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  return db
+    .select({
+      id: users.id,
+      oauthName: users.name,
+      email: users.email,
+      profileName: users.profileName,
+      campus: users.campus,
+      major: users.major,
+      role: users.role,
+      createdAt: users.createdAt,
+      lastSignedIn: users.lastSignedIn,
+    })
+    .from(users)
+    .orderBy(desc(users.lastSignedIn), asc(users.id));
+}
+
+export async function updateUserRoleByAdmin(input: { actorUserId: number; targetUserId: number; role: "user" | "admin" }) {
+  const db = await getDb();
+  if (!db) throw new Error("数据库暂不可用");
+  assertAuditMutationAllowed("append");
+  const outcome = await db.transaction(async tx => {
+    const administrators = await tx.select({ id: users.id }).from(users).where(eq(users.role, "admin")).for("update");
+    const target = (await tx.select({ id: users.id, role: users.role }).from(users).where(eq(users.id, input.targetUserId)).limit(1).for("update"))[0];
+    if (!target) return { kind: "missing" as const };
+    const decision = decideUserRoleChange({ actorUserId: input.actorUserId, targetUserId: target.id, currentRole: target.role, nextRole: input.role, administratorCount: administrators.length });
+    if (decision.kind === "deny") {
+      await tx.insert(auditLogs).values({ actorUserId: input.actorUserId, action: "user.role.update", resourceType: "user", resourceId: String(target.id), outcome: "denied", reason: decision.reason });
+      return { kind: "deny" as const, message: decision.message };
+    }
+    if (decision.kind === "noop") return { kind: "noop" as const, targetUserId: target.id };
+    await tx.update(users).set({ role: input.role }).where(eq(users.id, target.id));
+    await tx.insert(auditLogs).values({ actorUserId: input.actorUserId, action: "user.role.update", resourceType: "user", resourceId: String(target.id), outcome: "allowed", reason: `${target.role}_to_${input.role}` });
+    return { kind: "changed" as const, targetUserId: target.id };
+  });
+  if (outcome.kind === "missing") throw new Error("未找到目标用户");
+  if (outcome.kind === "deny") throw new Error(outcome.message);
+  return { changed: outcome.kind === "changed", user: (await listUsersForAdmin()).find(user => user.id === outcome.targetUserId) };
 }
 
 export async function updateProductStatus(input: { productId: number; status: "active" | "reserved" | "archived"; actorUserId: number }) {

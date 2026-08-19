@@ -4,7 +4,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
-import { Archive, BookOpen, Database, LockKeyhole, Package, RefreshCw, ShieldCheck, Upload } from "lucide-react";
+import { Archive, BookOpen, Database, LockKeyhole, Package, RefreshCw, ShieldCheck, Upload, UsersRound } from "lucide-react";
 import { toast } from "sonner";
 import { formatPrice, type CatalogProduct } from "@/components/ProductCard";
 import { useRef, useState } from "react";
@@ -14,12 +14,21 @@ const statusLabel = { active: "已上架", reserved: "已保留", archived: "已
 
 function AdminContent() {
   const utils = trpc.useUtils();
+  const { user: currentUser } = useAuth();
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [uploadType, setUploadType] = useState<"policy" | "after_sales" | "faq">("policy");
   const [publicSourceUrl, setPublicSourceUrl] = useState("");
   const [supersedesDocumentId, setSupersedesDocumentId] = useState<number | undefined>();
   const products = trpc.admin.products.useQuery();
+  const userDirectory = trpc.admin.users.useQuery();
   const knowledgeDocuments = trpc.admin.knowledgeDocuments.useQuery();
+  const updateUserRole = trpc.admin.updateUserRole.useMutation({
+    onSuccess: result => {
+      toast.success(result.changed ? "用户角色已更新" : "用户已处于该角色", { description: "本次角色操作已写入安全审计记录。" });
+      void utils.admin.users.invalidate();
+    },
+    onError: error => toast.error("角色修改失败", { description: error.message }),
+  });
   const seed = trpc.admin.seedDemoCatalog.useMutation({
     onSuccess: result => {
       toast.success(result.seeded ? "演示目录已初始化" : "演示目录已存在");
@@ -106,6 +115,14 @@ function AdminContent() {
   const activeCount = items.filter(item => item.product.status === "active").length;
   const reservedCount = items.filter(item => item.product.status === "reserved").length;
   const replaceableDocuments = (knowledgeDocuments.data ?? []).filter(document => document.lifecycleStatus === "active" && !document.storageKey.startsWith("docs/knowledge-base/"));
+  const managedUsers = userDirectory.data ?? [];
+  const administratorCount = managedUsers.filter(managedUser => managedUser.role === "admin").length;
+
+  const requestRoleChange = (targetUserId: number, targetLabel: string, nextRole: "user" | "admin") => {
+    const action = nextRole === "admin" ? "提升为管理员" : "设为普通用户";
+    if (!window.confirm(`确认将“${targetLabel}”${action}吗？该操作会立即改变后台访问权限并写入审计记录。`)) return;
+    updateUserRole.mutate({ userId: targetUserId, role: nextRole });
+  };
 
   return <div className="mx-auto max-w-6xl space-y-7 pb-10">
     <section className="overflow-hidden rounded-[1.75rem] bg-primary p-7 text-primary-foreground shadow-[0_22px_54px_-32px_rgba(45,33,60,0.85)] sm:p-9">
@@ -114,10 +131,18 @@ function AdminContent() {
       <p className="mt-4 max-w-2xl text-sm leading-6 text-[#eadff1]">所有操作均通过服务端 `adminProcedure` 校验。普通用户既看不到该入口，也无法通过直接请求绕过角色门槛。</p>
     </section>
 
-    <section className="grid gap-4 md:grid-cols-3">
+    <section className="grid gap-4 md:grid-cols-4">
       <div className="rounded-2xl border border-border bg-card p-5"><Package className="size-5 text-primary" /><p className="mt-5 text-xs font-semibold tracking-[0.12em] text-muted-foreground">目录商品</p><p className="mt-1 font-mono text-3xl font-bold text-foreground">{items.length}</p></div>
       <div className="rounded-2xl border border-border bg-card p-5"><ShieldCheck className="size-5 text-accent" /><p className="mt-5 text-xs font-semibold tracking-[0.12em] text-muted-foreground">可下单</p><p className="mt-1 font-mono text-3xl font-bold text-foreground">{activeCount}</p></div>
       <div className="rounded-2xl border border-border bg-card p-5"><Archive className="size-5 text-primary" /><p className="mt-5 text-xs font-semibold tracking-[0.12em] text-muted-foreground">已保留</p><p className="mt-1 font-mono text-3xl font-bold text-foreground">{reservedCount}</p></div>
+      <div className="rounded-2xl border border-border bg-card p-5"><UsersRound className="size-5 text-primary" /><p className="mt-5 text-xs font-semibold tracking-[0.12em] text-muted-foreground">注册账户</p><p className="mt-1 font-mono text-3xl font-bold text-foreground">{managedUsers.length}</p></div>
+    </section>
+
+    <section id="users" className="rounded-[1.5rem] border border-border bg-card p-5 sm:p-7">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="text-xs font-semibold tracking-[0.14em] text-primary">USER & ROLE CONTROL</p><h2 className="mt-2 font-display text-2xl font-bold tracking-[-0.04em]">用户角色管理</h2><p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">管理员可查看登录用户并调整其他账户的角色。普通用户无法调用该接口；当前账户不可修改自身角色，系统也会阻止降级最后一名管理员。</p></div><Badge variant="secondary" className="h-fit font-normal">管理员 {administratorCount} 名</Badge></div>
+      <div className="mt-6 overflow-x-auto"><table className="w-full min-w-[760px] text-left text-sm"><thead className="border-y border-border bg-secondary/35 text-xs font-semibold text-muted-foreground"><tr><th className="px-4 py-3">用户</th><th className="px-4 py-3">学校 / 专业</th><th className="px-4 py-3">最近登录</th><th className="px-4 py-3">角色</th><th className="px-4 py-3 text-right">权限操作</th></tr></thead><tbody>{managedUsers.map(managedUser => { const label = managedUser.profileName || managedUser.oauthName || `用户 #${managedUser.id}`; const isCurrentUser = managedUser.id === currentUser?.id; const isLastAdministrator = managedUser.role === "admin" && administratorCount <= 1; return <tr key={managedUser.id} className="border-b border-border/70 last:border-b-0"><td className="px-4 py-4"><p className="font-medium text-foreground">{label}{isCurrentUser ? <span className="ml-2 text-xs text-muted-foreground">当前账户</span> : null}</p><p className="mt-1 max-w-56 truncate text-xs text-muted-foreground">{managedUser.email ?? "未提供邮箱"}</p></td><td className="px-4 py-4 text-muted-foreground">{[managedUser.campus, managedUser.major].filter(Boolean).join(" · ") || "未填写"}</td><td className="px-4 py-4 text-muted-foreground">{new Date(managedUser.lastSignedIn).toLocaleString("zh-CN")}</td><td className="px-4 py-4"><Badge variant={managedUser.role === "admin" ? "secondary" : "outline"} className="font-normal">{managedUser.role === "admin" ? "管理员" : "普通用户"}</Badge></td><td className="px-4 py-4 text-right">{isCurrentUser ? <span className="text-xs text-muted-foreground">为防止误锁定，不能修改自己</span> : managedUser.role === "admin" ? <Button size="sm" variant="outline" className="rounded-lg" disabled={updateUserRole.isPending || isLastAdministrator} title={isLastAdministrator ? "系统必须至少保留一名管理员" : undefined} onClick={() => requestRoleChange(managedUser.id, label, "user")}>{isLastAdministrator ? "保留最后管理员" : "设为普通用户"}</Button> : <Button size="sm" className="rounded-lg" disabled={updateUserRole.isPending} onClick={() => requestRoleChange(managedUser.id, label, "admin")}>提升为管理员</Button>}</td></tr>; })}</tbody></table></div>
+      {userDirectory.isLoading ? <div className="mt-5 h-20 animate-pulse rounded-xl bg-secondary" /> : null}
+      {!userDirectory.isLoading && managedUsers.length === 0 ? <p className="mt-5 rounded-xl border border-dashed border-border bg-secondary/20 p-4 text-sm text-muted-foreground">尚未检索到可管理的用户记录。</p> : null}
     </section>
 
     <section id="products" className="rounded-[1.5rem] border border-border bg-card p-5 sm:p-7">

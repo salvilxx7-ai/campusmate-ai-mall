@@ -88,3 +88,8 @@
 - [x] Introduce separate visible entry points for ordinary user registration/login and administrator login while preserving server-side role gates.
 - [x] Define the registration, authentication, role-assignment, and admin-access data flow without allowing self-service administrator privilege escalation.
 - [x] Add OAuth-return authorization regression tests, update the baseline/interview log, and re-verify desktop and mobile administrator/login-route states.
+- [x] Audit the existing profile data model, OAuth-owned fields, administrator role gates, and role-management failure modes before extending user management.
+- [x] Implement authenticated users' self-only basic-profile view and edit flow with server-side field validation and audit evidence.
+- [x] Implement an administrator-only user directory and explicit user-role change procedure without allowing ordinary users to alter roles.
+- [x] Add safeguards for self-demotion, last-administrator removal, and privileged role changes, with append-only audit records.
+- [x] Add profile/role authorization tests, update baseline and engineering-interview documentation, and verify responsive user and administrator flows.
